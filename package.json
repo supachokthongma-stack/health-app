@@ -10,9 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-react": "^1.18.0",
+    "@emailjs/browser": "^4.4.1",
     "@tensorflow-models/mobilenet": "^2.1.0",
     "@tensorflow/tfjs": "^4.11.0",
+    "lucide-react": "^1.18.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

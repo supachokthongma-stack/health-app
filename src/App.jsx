@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import emailjs from '@emailjs/browser';
 import {
   Activity,
   Flame,
@@ -22,6 +23,9 @@ import {
 } from 'lucide-react';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as tf from '@tensorflow/tfjs';
+
+// Initialize EmailJS
+emailjs.init('m9n9iTEHA16p3K76y');
 
 const NAV_ITEMS = [
   { id: 'home', label: 'หน้าแรก', icon: Home },
@@ -493,7 +497,26 @@ function App() {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setSentOtpCode(otp);
     setVerificationStep('otp');
-    alert(`OTP ของคุณ: ${otp}\n(ในแอปจริง จะส่งไปยังอีเมลของคุณ)`);
+    
+    // Send OTP via EmailJS
+    const sendOtpEmail = async () => {
+      try {
+        const templateParams = {
+          to_email: email,
+          to_name: name,
+          otp_code: otp,
+          user_name: name,
+        };
+        
+        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams);
+        alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
+      } catch (error) {
+        console.error('Error sending email:', error);
+        alert(`⚠️ ไม่สามารถส่งอีเมลได้\n\nOTP ของคุณ: ${otp}\n\nกรุณาตั้งค่า EmailJS ก่อน (ดูรายละเอียดในเอกสาร)`);
+      }
+    };
+    
+    sendOtpEmail();
   };
 
   const handleVerifyOtp = () => {
@@ -568,6 +591,33 @@ function App() {
   };
 
   const logout = () => { setCurrentUser(null); setActiveTab('home'); };
+
+  const resendOtp = async () => {
+    if (!currentUser) return;
+    
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setSentOtpCode(otp);
+    setVerificationStep('otp');
+    
+    const sendOtpEmail = async () => {
+      try {
+        const templateParams = {
+          to_email: currentUser.email,
+          to_name: currentUser.name,
+          otp_code: otp,
+          user_name: currentUser.name,
+        };
+        
+        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams);
+        alert(`✓ OTP ถูกส่งไปที่: ${currentUser.email}`);
+      } catch (error) {
+        console.error('Error sending email:', error);
+        alert(`⚠️ ไม่สามารถส่งอีเมลได้\n\nOTP: ${otp}\n\nกรุณาตั้งค่า EmailJS ก่อน`);
+      }
+    };
+    
+    sendOtpEmail();
+  };
 
   const updateUser = (updates) => {
     if (!currentUser) return;
@@ -1093,7 +1143,7 @@ function App() {
         ) : activeTab === 'chat' ? (
           <ChatTab chatHistory={currentUser.chatHistory || []} messageText={messageText} setMessageText={setMessageText} onSend={sendMessage} isTyping={isTyping} />
         ) : activeTab === 'settings' ? (
-          <SettingsTab user={currentUser} addZwiftActivity={addZwiftActivity} addAppleHealthData={addAppleHealthData} />
+          <SettingsTab user={currentUser} addZwiftActivity={addZwiftActivity} addAppleHealthData={addAppleHealthData} resendOtp={resendOtp} />
         ) : null}
       </main>
     </div>
@@ -1668,7 +1718,7 @@ function ChatTab({ chatHistory, messageText, setMessageText, onSend, isTyping })
   );
 }
 
-function SettingsTab({ user, addZwiftActivity, addAppleHealthData }) {
+function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) {
   const [zwiftInput, setZwiftInput] = useState('');
   const [appleHealthInput, setAppleHealthInput] = useState('');
   
@@ -1710,6 +1760,11 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData }) {
         <label>เพศ<input type="text" value={user.gender === 'male' ? 'ชาย' : user.gender === 'female' ? 'หญิง' : 'อื่น ๆ'} readOnly /></label>
         <label>อีเมล<input type="email" value={user.email} readOnly /></label>
         <label>สถานะยืนยันอีเมล<input type="text" value={user.emailVerified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'} readOnly /></label>
+        {!user.emailVerified && (
+          <button type="button" className="button primary" onClick={resendOtp} style={{ marginTop: '12px', width: '100%' }}>
+            ส่ง OTP อีกครั้ง
+          </button>
+        )}
         <label>เป้าหมายน้ำหนัก<input type="number" value={user.targetWeight} readOnly /></label>
       </section>
 
