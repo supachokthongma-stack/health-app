@@ -508,7 +508,8 @@ function App() {
           user_name: name,
         };
         
-       await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
+      // เปลี่ยนมาเรียกใช้แบบนี้เพื่อป้องกันไม่ให้ Component มองไม่เห็นตัวแปร emailjs ครับ
+        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams);
         alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
       } catch (error) {
         console.error('Error sending email:', error);
