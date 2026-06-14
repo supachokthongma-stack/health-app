@@ -372,7 +372,34 @@ const INITIAL_USER = {
   },
 };
 
+const REMEMBER_KEY = 'healthAppRemember';
+
+function loadRememberedCredentials() {
+  try {
+    const saved = localStorage.getItem(REMEMBER_KEY);
+    if (!saved) return { email: '', password: '', rememberMe: false };
+    const data = JSON.parse(saved);
+    if (!data.email) return { email: '', password: '', rememberMe: false };
+    return {
+      email: data.email,
+      password: data.password || '',
+      rememberMe: true,
+    };
+  } catch {
+    return { email: '', password: '', rememberMe: false };
+  }
+}
+
+function saveRememberedCredentials(email, password, remember) {
+  if (remember) {
+    localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email, password }));
+  } else {
+    localStorage.removeItem(REMEMBER_KEY);
+  }
+}
+
 function App() {
+  const remembered = loadRememberedCredentials();
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('healthAppUsers');
     if (!saved) return [];
@@ -391,7 +418,16 @@ function App() {
   const [otpCode, setOtpCode] = useState('');
   const [sentOtpCode, setSentOtpCode] = useState('');
   const [activeTab, setActiveTab] = useState('home');
-  const [form, setForm] = useState({ name: '', email: '', password: '', age: '28', gender: 'female', currentWeight: '75', targetWeight: '65' });
+  const [form, setForm] = useState({
+    name: '',
+    email: remembered.email,
+    password: remembered.password,
+    age: '28',
+    gender: 'female',
+    currentWeight: '75',
+    targetWeight: '65',
+  });
+  const [rememberMe, setRememberMe] = useState(remembered.rememberMe);
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
@@ -401,7 +437,10 @@ function App() {
   const [analysisMealType, setAnalysisMealType] = useState('');
   const [tfModel, setTfModel] = useState(null);
   const [modelLoading, setModelLoading] = useState(true);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(() => window.innerWidth >= 1024);
+  const [isCompact, setIsCompact] = useState(() => window.innerWidth < 1024);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const autoLoginAttempted = useRef(false);
   const [pendingPremiumCourse, setPendingPremiumCourse] = useState(null);
   const [pendingExerciseSchedule, setPendingExerciseSchedule] = useState([]);
 
@@ -421,6 +460,48 @@ function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      const compact = window.innerWidth < 1024;
+      setIsCompact(compact);
+      if (compact) {
+        setSidebarOpen(false);
+      }
+    };
+
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (autoLoginAttempted.current || currentUser) return;
+    autoLoginAttempted.current = true;
+
+    const saved = loadRememberedCredentials();
+    if (!saved.rememberMe || !saved.email || !saved.password) return;
+
+    const user = users.find(
+      (item) => item.email === saved.email && item.password === saved.password,
+    );
+    if (user?.emailVerified) {
+      setCurrentUser(user);
+    }
+  }, [users, currentUser]);
+
+  const resetAuthForm = (keepCredentials = rememberMe) => {
+    const saved = keepCredentials ? loadRememberedCredentials() : { email: '', password: '' };
+    setForm({
+      name: '',
+      email: saved.email,
+      password: saved.password,
+      age: '28',
+      gender: 'female',
+      currentWeight: '75',
+      targetWeight: '65',
+    });
+  };
 
   // Load MobileNet model for client-side classification
   useEffect(() => {
@@ -555,7 +636,8 @@ function App() {
     };
     setUsers([...users, newUser]);
     setCurrentUser(newUser);
-    setForm({ name: '', email: '', password: '', age: '28', gender: 'female', currentWeight: '75', targetWeight: '65' });
+    saveRememberedCredentials(email, password, rememberMe);
+    resetAuthForm(true);
     setVerificationStep(null);
     setOtpCode('');
     setSentOtpCode('');
@@ -585,11 +667,23 @@ function App() {
     
     setCurrentUser(updatedUser);
     setUsers(users.map((item) => (item.id === updatedUser.id ? updatedUser : item)));
-    setForm({ name: '', email: '', password: '', age: '28', gender: 'female', currentWeight: '75', targetWeight: '65' });
+    saveRememberedCredentials(email, password, rememberMe);
+    resetAuthForm(true);
     setActiveTab('home');
   };
 
-  const logout = () => { setCurrentUser(null); setActiveTab('home'); };
+  const logout = () => {
+    const saved = loadRememberedCredentials();
+    setCurrentUser(null);
+    setActiveTab('home');
+    setSidebarOpen(false);
+    setRememberMe(saved.rememberMe);
+    setForm((prev) => ({
+      ...prev,
+      email: saved.email,
+      password: saved.password,
+    }));
+  };
 
   const resendOtp = async () => {
     if (!currentUser) return;
@@ -1039,6 +1133,16 @@ function App() {
               )}
               <label>อีเมล (Gmail เท่านั้น)<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@gmail.com" /></label>
               <label>รหัสผ่าน<input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="รหัสผ่าน" /></label>
+              {authMode === 'login' && (
+                <label className="remember-me">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>จดจำอีเมลและรหัสผ่าน</span>
+                </label>
+              )}
             </div>
           )}
 
@@ -1071,35 +1175,72 @@ function App() {
     ? { ...selectedCourse, exerciseSchedule: currentUser.customExerciseSchedule || selectedCourse.exerciseSchedule }
     : null;
 
+  const sidebarVisible = !isCompact || sidebarOpen;
+  const sidebarExpanded = isCompact || showSidebar;
+
   return (
-    <div className="app-shell">
-      <aside className={`sidebar ${showSidebar ? '' : 'collapsed'}`}>
-        <div className="sidebar-top">
-          <div className="brand">
-            <div className="brand-icon"><Activity size={22} /></div>
-            {showSidebar && (<div><p className="brand-label">Health Trainer</p><p className="brand-subtitle">ดูแลสุขภาพง่าย ๆ</p></div>)}
+    <div className={`app-shell ${isCompact ? 'compact' : ''}`}>
+      {isCompact && sidebarOpen && (
+        <button type="button" className="sidebar-backdrop" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} />
+      )}
+      {sidebarVisible && (
+        <aside className={`sidebar ${isCompact ? 'open' : (showSidebar ? '' : 'collapsed')}`}>
+          <div className="sidebar-top">
+            <div className="brand">
+              <div className="brand-icon"><Activity size={22} /></div>
+              {sidebarExpanded && (
+                <div>
+                  <p className="brand-label">Health Trainer</p>
+                  <p className="brand-subtitle">ดูแลสุขภาพง่าย ๆ</p>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => (isCompact ? setSidebarOpen(false) : setShowSidebar(!showSidebar))}
+            >
+              {sidebarExpanded ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
-          <button type="button" className="icon-button" onClick={() => setShowSidebar(!showSidebar)}>{showSidebar ? <X size={18} /> : <Menu size={18} />}</button>
-        </div>
-        <nav className="nav-list">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button type="button" key={item.id} className={`nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={() => setActiveTab(item.id)}>
-                <Icon size={18} />
-                {showSidebar && <span>{item.label}</span>}
-              </button>
-            );
-          })}
-        </nav>
-        <button type="button" className="logout" onClick={logout}><LogOut size={18} />{showSidebar && <span>ออกจากระบบ</span>}</button>
-      </aside>
+          <nav className="nav-list">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    if (isCompact) setSidebarOpen(false);
+                  }}
+                >
+                  <Icon size={18} />
+                  {sidebarExpanded && <span>{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+          <button type="button" className="logout" onClick={logout}>
+            <LogOut size={18} />
+            {sidebarExpanded && <span>ออกจากระบบ</span>}
+          </button>
+        </aside>
+      )}
       <main className="content">
         <div className="page-header">
-          <div>
-            <p className="header-badge"><Star size={16} /> สวัสดี {currentUser.name || 'ผู้ใช้งาน'}</p>
-            <h1>ยินดีต้อนรับสู่ Health Trainer</h1>
-            <p>ติดตามอาหาร ออกกำลังกาย และความก้าวหน้าในที่เดียว</p>
+          <div className="page-header-top">
+            {isCompact && !sidebarOpen && (
+              <button type="button" className="icon-button mobile-menu-btn" aria-label="เปิดเมนู" onClick={() => setSidebarOpen(true)}>
+                <Menu size={18} />
+              </button>
+            )}
+            <div>
+              <p className="header-badge"><Star size={16} /> สวัสดี {currentUser.name || 'ผู้ใช้งาน'}</p>
+              <h1>ยินดีต้อนรับสู่ Health Trainer 🏋️✨</h1>
+              <p>ติดตามอาหาร 🥗 ออกกำลังกาย 💪 และความก้าวหน้า 📈 ในที่เดียว</p>
+            </div>
           </div>
           <div className="stat-pill"><span><strong>{currentWeight} กก.</strong></span></div>
         </div>
