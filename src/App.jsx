@@ -425,6 +425,31 @@ const INITIAL_USER = {
 };
 
 const REMEMBER_KEY = 'healthAppRemember';
+const OTP_SESSION_KEY = 'healthAppOtpSession';
+const OTP_RESEND_COOLDOWN_SEC = 30;
+
+function loadOtpSession() {
+  try {
+    const raw = sessionStorage.getItem(OTP_SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.otpExpiresAt && Date.now() > data.otpExpiresAt) {
+      sessionStorage.removeItem(OTP_SESSION_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveOtpSession(data) {
+  sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data));
+}
+
+function clearOtpSessionStorage() {
+  sessionStorage.removeItem(OTP_SESSION_KEY);
+}
 
 function loadRememberedCredentials() {
   try {
@@ -452,6 +477,7 @@ function saveRememberedCredentials(email, password, remember) {
 
 function App() {
   const remembered = loadRememberedCredentials();
+  const otpSession = loadOtpSession();
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('healthAppUsers');
     if (!saved) return [];
@@ -465,26 +491,28 @@ function App() {
     try { return JSON.parse(saved).find((item) => item.id === currentId) || null; } catch { return null; }
   });
 
-  const [authMode, setAuthMode] = useState('login');
-  const [verificationStep, setVerificationStep] = useState(null);
-  const [otpPurpose, setOtpPurpose] = useState(null);
-  const [otpTargetEmail, setOtpTargetEmail] = useState('');
-  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
-  const [resetUserId, setResetUserId] = useState(null);
+  const [authMode, setAuthMode] = useState(otpSession?.authMode || 'login');
+  const [verificationStep, setVerificationStep] = useState(otpSession?.verificationStep || null);
+  const [otpPurpose, setOtpPurpose] = useState(otpSession?.otpPurpose || null);
+  const [otpTargetEmail, setOtpTargetEmail] = useState(otpSession?.otpTargetEmail || '');
+  const [otpExpiresAt, setOtpExpiresAt] = useState(otpSession?.otpExpiresAt || null);
+  const [resetUserId, setResetUserId] = useState(otpSession?.resetUserId || null);
   const [otpCode, setOtpCode] = useState('');
-  const [sentOtpCode, setSentOtpCode] = useState('');
+  const [sentOtpCode, setSentOtpCode] = useState(otpSession?.sentOtpCode || '');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
   const [form, setForm] = useState({
-    name: '',
-    email: remembered.email,
-    phone: '',
-    password: remembered.password,
+    name: otpSession?.form?.name || '',
+    email: otpSession?.form?.email || remembered.email,
+    phone: otpSession?.form?.phone || '',
+    password: otpSession?.form?.password || remembered.password,
     newPassword: '',
     confirmPassword: '',
-    age: '28',
-    gender: 'female',
-    currentWeight: '75',
-    targetWeight: '65',
+    age: otpSession?.form?.age || '28',
+    gender: otpSession?.form?.gender || 'female',
+    currentWeight: otpSession?.form?.currentWeight || '75',
+    targetWeight: otpSession?.form?.targetWeight || '65',
   });
   const [rememberMe, setRememberMe] = useState(remembered.rememberMe);
   const [authBanner, setAuthBanner] = useState(null);
@@ -507,6 +535,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('healthAppUsers', JSON.stringify(users));
   }, [users]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (currentUser) localStorage.setItem('healthAppCurrent', currentUser.id);
@@ -574,6 +610,30 @@ function App() {
     setOtpPurpose(null);
     setResetUserId(null);
     setVerificationStep(null);
+    setResendCooldown(0);
+    clearOtpSessionStorage();
+  };
+
+  const persistOtpSession = (payload) => {
+    saveOtpSession({
+      verificationStep: 'otp',
+      sentOtpCode: payload.otp,
+      otpExpiresAt: payload.expiresAt,
+      otpTargetEmail: payload.toEmail,
+      otpPurpose: payload.purpose,
+      resetUserId: payload.resetUserId ?? resetUserId,
+      authMode,
+      form: {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        password: form.password,
+        age: form.age,
+        gender: form.gender,
+        currentWeight: form.currentWeight,
+        targetWeight: form.targetWeight,
+      },
+    });
   };
 
   const switchAuthMode = (mode) => {
@@ -593,21 +653,36 @@ function App() {
     }
   };
 
-  const issueOtp = async ({ toEmail, userName, purpose }) => {
+  const issueOtp = async ({ toEmail, userName, purpose, isResend = false }) => {
+    if (isSendingOtp) return false;
+    if (isResend && resendCooldown > 0) {
+      setAuthBanner({
+        type: 'error',
+        text: `กรุณารอ ${resendCooldown} วินาที ก่อนขอ OTP ใหม่`,
+      });
+      return false;
+    }
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + OTP_TTL_MS;
     setAuthBanner(null);
+    setIsSendingOtp(true);
 
     try {
       await sendOtpEmail({ toEmail, otp });
       setSentOtpCode(otp);
-      setOtpExpiresAt(Date.now() + OTP_TTL_MS);
+      setOtpExpiresAt(expiresAt);
       setOtpTargetEmail(toEmail);
       setOtpPurpose(purpose);
       setVerificationStep('otp');
       setOtpCode('');
+      persistOtpSession({ otp, expiresAt, toEmail, purpose });
+      setResendCooldown(OTP_RESEND_COOLDOWN_SEC);
       setAuthBanner({
         type: 'success',
-        text: `ส่ง OTP ไปที่ ${maskEmail(toEmail)} แล้ว กรุณาเปิด Gmail แล้วกรอกรหัส 6 หลัก`,
+        text: isResend
+          ? `ส่ง OTP ใหม่ไปที่ ${maskEmail(toEmail)} แล้ว`
+          : `ส่ง OTP ไปที่ ${maskEmail(toEmail)} แล้ว กรุณาเปิด Gmail แล้วกรอกรหัส 6 หลัก`,
       });
       return true;
     } catch (error) {
@@ -617,6 +692,8 @@ function App() {
         text: getEmailJsErrorMessage(error),
       });
       return false;
+    } finally {
+      setIsSendingOtp(false);
     }
   };
 
@@ -731,6 +808,23 @@ function App() {
       setOtpCode('');
       setSentOtpCode('');
       setOtpExpiresAt(null);
+      saveOtpSession({
+        verificationStep: 'reset-password',
+        otpTargetEmail,
+        otpPurpose,
+        resetUserId,
+        authMode,
+        form: {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          password: form.password,
+          age: form.age,
+          gender: form.gender,
+          currentWeight: form.currentWeight,
+          targetWeight: form.targetWeight,
+        },
+      });
       return;
     }
 
@@ -942,25 +1036,20 @@ function App() {
   };
 
   const resendAuthOtp = async () => {
-    if (!otpTargetEmail) return;
-    setAuthBanner(null);
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    try {
-      await sendOtpEmail({ toEmail: otpTargetEmail, otp });
-      setSentOtpCode(otp);
-      setOtpExpiresAt(Date.now() + OTP_TTL_MS);
-      setOtpCode('');
-      setAuthBanner({
-        type: 'success',
-        text: `ส่ง OTP ใหม่ไปที่ ${maskEmail(otpTargetEmail)} แล้ว`,
-      });
-    } catch (error) {
-      console.error('Error sending email:', error);
+    const email = (otpTargetEmail || form.email.trim().toLowerCase()).trim();
+    if (!email) {
       setAuthBanner({
         type: 'error',
-        text: getEmailJsErrorMessage(error),
+        text: 'ไม่พบอีเมลสำหรับส่ง OTP กรุณาย้อนกลับแล้วกรอกอีเมลใหม่',
       });
+      return;
     }
+    await issueOtp({
+      toEmail: email,
+      userName: form.name,
+      purpose: otpPurpose || 'register',
+      isResend: true,
+    });
   };
 
   const updateUser = (updates) => {
@@ -1483,21 +1572,38 @@ function App() {
 
           <div className="auth-actions">
             {verificationStep === 'otp' ? (
-              <button type="button" className="button primary" onClick={handleVerifyOtp}>ยืนยัน OTP</button>
+              <button type="button" className="button primary" disabled={isSendingOtp} onClick={handleVerifyOtp}>ยืนยัน OTP</button>
             ) : verificationStep === 'reset-password' ? (
               <button type="button" className="button primary" onClick={handleResetPassword}>บันทึกรหัสผ่านใหม่</button>
             ) : authMode === 'forgot' ? (
-              <button type="button" className="button primary" onClick={handleForgotPasswordRequest}>ส่ง OTP ไป Gmail</button>
+              <button type="button" className="button primary" disabled={isSendingOtp} onClick={handleForgotPasswordRequest}>
+                {isSendingOtp ? 'กำลังส่ง OTP...' : 'ส่ง OTP ไป Gmail'}
+              </button>
             ) : (
-              <button type="button" className="button primary" onClick={authMode === 'login' ? handleLogin : handleRegister}>
-                {authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครและรับ OTP'}
+              <button type="button" className="button primary" disabled={isSendingOtp} onClick={authMode === 'login' ? handleLogin : handleRegister}>
+                {isSendingOtp
+                  ? 'กำลังส่ง OTP...'
+                  : authMode === 'login'
+                    ? 'เข้าสู่ระบบ'
+                    : 'สมัครและรับ OTP'}
               </button>
             )}
           </div>
 
           {verificationStep === 'otp' && (
             <p className="auth-note">
-              <button type="button" className="text-link" onClick={resendAuthOtp}>ส่ง OTP อีกครั้ง</button>
+              <button
+                type="button"
+                className="text-link"
+                disabled={isSendingOtp || resendCooldown > 0}
+                onClick={resendAuthOtp}
+              >
+                {isSendingOtp
+                  ? 'กำลังส่ง...'
+                  : resendCooldown > 0
+                    ? `ส่ง OTP อีกครั้ง (${resendCooldown}s)`
+                    : 'ส่ง OTP อีกครั้ง'}
+              </button>
               {' · '}
               <button type="button" className="text-link" onClick={() => { clearOtpState(); switchAuthMode('login'); }}>ย้อนกลับ</button>
             </p>

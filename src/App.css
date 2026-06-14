@@ -427,6 +427,11 @@ a {
   font-weight: 600;
 }
 
+.text-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .auth-otp-banner {
   padding: 16px 18px;
   border-radius: 18px;
