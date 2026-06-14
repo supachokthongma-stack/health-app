@@ -498,17 +498,14 @@ function App() {
     setSentOtpCode(otp);
     setVerificationStep('otp');
     
-    // Send OTP via EmailJS
-    const sendOtpEmail = async () => {
-      try {
-        const templateParams = {
-          to_email: email,
-          to_name: name,
-          otp_code: otp,
-          user_name: name,
-        };
+    const templateParams = {
+      to_email: email,
+      to_name: name,
+      user_name: name,
+      otp_code: otp,
+      };
         
-     
+        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
         alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
       } catch (error) {
         console.error('Error sending email:', error);
@@ -604,18 +601,12 @@ function App() {
       try {
         const templateParams = {
           to_email: currentUser.email,
-          to_name: currentUser.name,
           otp_code: otp,
-          user_name: currentUser.name,
         };
         
-        // ❌ ของเดิมที่มี 2 บรรทัดซ้ำกันขวางอยู่ ให้ลบออกทั้งหมดแล้วเปลี่ยนเป็นแบบด้านล่างนี้ครับ:
-
-        // ✅ ปรับให้เหลือบรรทัดเดียว และระบุค่าให้ครบถ้วนแบบนี้เลยครับ
         await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
-        
-        alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
-     } catch (error) {
+        alert(`✓ OTP ถูกส่งไปที่: ${currentUser.email}`);
+      } catch (error) {
         console.error('Error sending email:', error);
           const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || JSON.stringify(error));
           alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nOTP: ${otp}\n\nตรวจสอบ template!`);
