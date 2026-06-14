@@ -1906,13 +1906,13 @@ a {
   color: var(--muted);
 }
 
-/* Tablet (iPad portrait / small laptop) */
+/* Tablet (iPad portrait / small laptop) — desktop content only */
 @media (max-width: 1199px) {
-  .grid-layout {
+  .content:not(.content--mobile) .grid-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .meal-history-card {
+  .content:not(.content--mobile) .meal-history-card {
     grid-column: span 2;
   }
 
@@ -2596,6 +2596,262 @@ a {
   .small-cards--compact {
     grid-template-columns: 1fr;
   }
+}
+
+/* Mobile stack layout — JS adds .content--mobile when width < 1024px */
+.content--mobile .grid-layout,
+.grid-layout--stack {
+  grid-template-columns: 1fr !important;
+  gap: 12px;
+}
+
+.content--mobile .grid-layout > *,
+.grid-layout--stack > * {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.content--mobile .card,
+.grid-layout--stack .card {
+  overflow: hidden;
+}
+
+.content--mobile .card-head,
+.grid-layout--stack .card-head {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.content--mobile .card-head h2,
+.grid-layout--stack .card-head h2 {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.content--mobile .schedule-list,
+.content--mobile .meal-summary-grid,
+.content--mobile .recipe-list,
+.content--mobile .meal-log-list,
+.content--mobile .exercise-schedule-grid,
+.grid-layout--stack .schedule-list,
+.grid-layout--stack .meal-summary-grid,
+.grid-layout--stack .recipe-list,
+.grid-layout--stack .meal-log-list,
+.grid-layout--stack .exercise-schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .schedule-item,
+.content--mobile .exercise-schedule-card-item,
+.grid-layout--stack .schedule-item,
+.grid-layout--stack .exercise-schedule-card-item {
+  display: grid;
+  grid-template-columns: minmax(48px, auto) minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .schedule-time,
+.grid-layout--stack .schedule-time {
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.content--mobile .schedule-detail,
+.grid-layout--stack .schedule-detail {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  font-size: 0.88rem;
+}
+
+.content--mobile .meal-summary-block,
+.content--mobile .weekly-meal-card,
+.grid-layout--stack .meal-summary-block,
+.grid-layout--stack .weekly-meal-card {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 14px;
+}
+
+.content--mobile .meal-summary-items,
+.grid-layout--stack .meal-summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .meal-summary-line,
+.content--mobile .weekly-meal-row,
+.grid-layout--stack .meal-summary-line,
+.grid-layout--stack .weekly-meal-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(124, 58, 237, 0.06);
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .meal-summary-line span,
+.content--mobile .weekly-meal-row span,
+.grid-layout--stack .meal-summary-line span,
+.grid-layout--stack .weekly-meal-row span {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.content--mobile .meal-summary-line span:first-child,
+.content--mobile .weekly-meal-row span:first-child,
+.grid-layout--stack .meal-summary-line span:first-child,
+.grid-layout--stack .weekly-meal-row span:first-child {
+  font-size: 0.76rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.content--mobile .recipe-item,
+.grid-layout--stack .recipe-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.content--mobile .recipe-item-body,
+.grid-layout--stack .recipe-item-body {
+  min-width: 0;
+}
+
+.content--mobile .recipe-item-body strong,
+.grid-layout--stack .recipe-item-body strong {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.content--mobile .meal-log-item,
+.grid-layout--stack .meal-log-item {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.content--mobile .meal-log-item > div,
+.grid-layout--stack .meal-log-item > div {
+  min-width: 0;
+  width: 100%;
+}
+
+.content--mobile .meal-log-item strong,
+.grid-layout--stack .meal-log-item strong {
+  display: block;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  margin-bottom: 4px;
+}
+
+.content--mobile .meal-log-item > div > span,
+.grid-layout--stack .meal-log-item > div > span {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.content--mobile .meal-log-form,
+.grid-layout--stack .meal-log-form {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.content--mobile .meal-log-form label,
+.grid-layout--stack .meal-log-form label {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .calorie-meta,
+.content--mobile .macro-summary,
+.grid-layout--stack .calorie-meta,
+.grid-layout--stack .macro-summary {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.content--mobile .header-info > div strong,
+.grid-layout--stack .header-info > div strong {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.content--mobile .history-day-item,
+.grid-layout--stack .history-day-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .history-date,
+.grid-layout--stack .history-date {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.content--mobile .history-meal-count,
+.grid-layout--stack .history-meal-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.content--mobile .tags,
+.grid-layout--stack .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.content--mobile .tag,
+.grid-layout--stack .tag {
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
 }
 
 /* Large phones */

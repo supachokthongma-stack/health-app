@@ -1888,7 +1888,7 @@ function HomeTab({ compact = false, currentUser, selectedCourse, mealLog }) {
   const selectedDayLabel = selectedDay ? `${selectedDay.dayLabel} ${selectedDay.displayDate}` : '';
 
   return (
-    <div className="grid-layout">
+    <div className={`grid-layout ${compact ? 'grid-layout--stack' : ''}`}>
       <section className="welcome-card card">
         <div className="card-head"><Calendar size={20} /><h2>ภาพรวม</h2></div>
         <p className="card-lead">
@@ -1946,7 +1946,7 @@ function HomeTab({ compact = false, currentUser, selectedCourse, mealLog }) {
       </section>
 
       <section className="exercise-schedule-card card">
-        <div className="card-head"><Dumbbell size={20} /><h2>ตารางออกกำลังกาย</h2></div>
+        <div className="card-head"><Dumbbell size={20} /><h2>{compact ? 'ออกกำลังกาย' : 'ตารางออกกำลังกาย'}</h2></div>
         <div className="schedule-list">
           {selectedCourse.exerciseSchedule.map((item) => (
             <div key={`${item.time}-${item.activity}`} className="schedule-item">
@@ -2052,7 +2052,7 @@ function MealsTab({ compact = false, recipes, selectedRecipe, setSelectedRecipe,
   };
 
   return (
-    <div className="grid-layout">
+    <div className={`grid-layout ${compact ? 'grid-layout--stack' : ''}`}>
       <section className="nutrition-card card">
         <div className="card-head"><Flame size={20} /><h2>เมนูสุขภาพ</h2></div>
         <div className="recipe-list">
