@@ -347,10 +347,59 @@ const AI_RESPONSES = [
   'สู้ต่อไปครับ ผมเป็นกำลังใจให้เสมอ',
 ];
 
+// EmailJS — OTP ส่งไป Gmail
+const EMAILJS_SERVICE = 'service_yiut5r8';
+const EMAILJS_TEMPLATE = 'template_gn2w5f7';
+const EMAILJS_PUBLIC_KEY = 'm9n9iTEHA16p3K76y';
+
+const OTP_TTL_MS = 10 * 60 * 1000;
+
+function isValidGmail(email) {
+  return /^[^\s@]+@gmail\.com$/i.test(String(email).trim());
+}
+
+function normalizePhone(phone) {
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length === 10 && digits.startsWith('0')) return digits;
+  if (digits.length === 9) return `0${digits}`;
+  return digits;
+}
+
+function isValidThaiPhone(phone) {
+  return /^0[689]\d{8}$/.test(normalizePhone(phone));
+}
+
+function maskEmail(email) {
+  const [name, domain] = String(email).split('@');
+  if (!domain) return email;
+  const visible = name.slice(0, 2);
+  return `${visible}${'*'.repeat(Math.max(name.length - 2, 2))}@${domain}`;
+}
+
+async function sendOtpEmail({ toEmail, otp, userName, purpose }) {
+  const purposeText = purpose === 'register'
+    ? 'ยืนยันการสมัครสมาชิก Health Trainer'
+    : purpose === 'forgot-password'
+      ? 'รีเซ็ตรหัสผ่าน Health Trainer'
+      : 'ยืนยันอีเมล Health Trainer';
+
+  const templateParams = {
+    to_email: toEmail,
+    to_name: userName || 'ผู้ใช้งาน',
+    user_name: userName || 'ผู้ใช้งาน',
+    otp_code: otp,
+    purpose: purposeText,
+    message: `รหัส OTP ของคุณคือ ${otp} (ใช้ได้ภายใน 10 นาที)`,
+  };
+
+  await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, templateParams, EMAILJS_PUBLIC_KEY);
+}
+
 const INITIAL_USER = {
   id: '',
   name: '',
   email: '',
+  phone: '',
   password: '',
   emailVerified: false,
   age: 28,
@@ -414,14 +463,21 @@ function App() {
   });
 
   const [authMode, setAuthMode] = useState('login');
-  const [verificationStep, setVerificationStep] = useState(null); // 'otp' or null
+  const [verificationStep, setVerificationStep] = useState(null);
+  const [otpPurpose, setOtpPurpose] = useState(null);
+  const [otpTargetEmail, setOtpTargetEmail] = useState('');
+  const [otpExpiresAt, setOtpExpiresAt] = useState(null);
+  const [resetUserId, setResetUserId] = useState(null);
   const [otpCode, setOtpCode] = useState('');
   const [sentOtpCode, setSentOtpCode] = useState('');
   const [activeTab, setActiveTab] = useState('home');
   const [form, setForm] = useState({
     name: '',
     email: remembered.email,
+    phone: '',
     password: remembered.password,
+    newPassword: '',
+    confirmPassword: '',
     age: '28',
     gender: 'female',
     currentWeight: '75',
@@ -495,12 +551,75 @@ function App() {
     setForm({
       name: '',
       email: saved.email,
+      phone: '',
       password: saved.password,
+      newPassword: '',
+      confirmPassword: '',
       age: '28',
       gender: 'female',
       currentWeight: '75',
       targetWeight: '65',
     });
+  };
+
+  const clearOtpState = () => {
+    setOtpCode('');
+    setSentOtpCode('');
+    setOtpExpiresAt(null);
+    setOtpTargetEmail('');
+    setOtpPurpose(null);
+    setResetUserId(null);
+    setVerificationStep(null);
+  };
+
+  const switchAuthMode = (mode) => {
+    setAuthMode(mode);
+    clearOtpState();
+    if (mode === 'login') {
+      const saved = loadRememberedCredentials();
+      setForm((prev) => ({
+        ...prev,
+        phone: '',
+        newPassword: '',
+        confirmPassword: '',
+        email: saved.email || prev.email,
+        password: saved.password || prev.password,
+      }));
+    }
+  };
+
+  const issueOtp = async ({ toEmail, userName, purpose }) => {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setSentOtpCode(otp);
+    setOtpExpiresAt(Date.now() + OTP_TTL_MS);
+    setOtpTargetEmail(toEmail);
+    setOtpPurpose(purpose);
+    setVerificationStep('otp');
+    setOtpCode('');
+
+    try {
+      await sendOtpEmail({ toEmail, otp, userName, purpose });
+      alert(`✓ ส่ง OTP ไปที่ Gmail: ${maskEmail(toEmail)}\nกรุณาเปิดอีเมลแล้วนำรหัส 6 หลักมากรอก`);
+      return true;
+    } catch (error) {
+      console.error('Error sending email:', error);
+      const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || 'ส่งอีเมลไม่สำเร็จ');
+      alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nตรวจสอบ EmailJS template ว่ามีตัวแปร:\n{{to_email}} {{to_name}} {{user_name}} {{otp_code}} {{purpose}} {{message}}`);
+      clearOtpState();
+      return false;
+    }
+  };
+
+  const isOtpValid = () => {
+    if (!sentOtpCode || otpCode.trim() !== sentOtpCode) {
+      alert('OTP ไม่ถูกต้อง กรุณาลองอีกครั้ง');
+      return false;
+    }
+    if (otpExpiresAt && Date.now() > otpExpiresAt) {
+      alert('OTP หมดอายุแล้ว กรุณาขอรหัสใหม่');
+      return false;
+    }
+    return true;
   };
 
   // Load MobileNet model for client-side classification
@@ -556,68 +675,98 @@ function App() {
     return l || 'อาหารทั่วไป';
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const name = form.name.trim();
-    const email = form.email.trim();
+    const email = form.email.trim().toLowerCase();
+    const phone = normalizePhone(form.phone);
     const password = form.password.trim();
     const age = Number(form.age);
     const gender = form.gender;
     const currentWeight = Number(form.currentWeight);
     const targetWeight = Number(form.targetWeight);
-    if (!name || !email || !password || !age || !gender || !currentWeight || !targetWeight) { alert('กรุณากรอกข้อมูลให้ครบทุกช่อง'); return; }
-    if (users.some((item) => item.email === email)) { alert('อีเมลนี้ถูกใช้งานแล้ว'); return; }
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@gmail\.com$/;
-    if (!emailRegex.test(email)) {
+
+    if (!name || !email || !phone || !password || !age || !gender || !currentWeight || !targetWeight) {
+      alert('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+      return;
+    }
+    if (!isValidGmail(email)) {
       alert('กรุณาใช้อีเมล Gmail เท่านั้น (เช่น example@gmail.com)');
       return;
     }
-    
-    // Generate and send OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setSentOtpCode(otp);
-    setVerificationStep('otp');
-    
-    // Send OTP via EmailJS
-    const sendOtpEmail = async () => {
-      try {
-        const templateParams = {
-          to_email: email,
-          otp_code: otp,
-        };
-        
-        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
-        alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
-      } catch (error) {
-        console.error('Error sending email:', error);
-          const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || JSON.stringify(error));
-          alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nOTP ของคุณ: ${otp}\n\nกรุณาตรวจสอบ EmailJS:\n• ไปที่ Dashboard\n• เปิด template: template_gn2w5f7\n• ตรวจสอบว่ามี variables:\n  {{to_email}}, {{to_name}}, {{otp_code}}, {{user_name}}`);
-      }
-    };
-    
-    sendOtpEmail();
+    if (!isValidThaiPhone(phone)) {
+      alert('กรุณากรอกเบอร์โทรศัพท์ไทยให้ถูกต้อง (เช่น 0812345678)');
+      return;
+    }
+    if (password.length < 6) {
+      alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+    if (users.some((item) => item.email === email)) {
+      alert('อีเมลนี้ถูกใช้งานแล้ว');
+      return;
+    }
+    if (users.some((item) => normalizePhone(item.phone || '') === phone)) {
+      alert('เบอร์โทรศัพท์นี้ถูกใช้งานแล้ว');
+      return;
+    }
+
+    await issueOtp({ toEmail: email, userName: name, purpose: 'register' });
   };
 
   const handleVerifyOtp = () => {
-    if (otpCode.trim() !== sentOtpCode) {
-      alert('OTP ไม่ถูกต้อง กรุณาลองอีกครั้ง');
+    if (!isOtpValid()) return;
+
+    if (otpPurpose === 'forgot-password') {
+      setVerificationStep('reset-password');
+      setOtpCode('');
+      setSentOtpCode('');
+      setOtpExpiresAt(null);
+      return;
+    }
+
+    if (otpPurpose === 'verify-email') {
+      const email = form.email.trim().toLowerCase();
+      const user = users.find((item) => item.email === email);
+      if (!user) {
+        alert('ไม่พบบัญชีผู้ใช้');
+        return;
+      }
+
+      const updatedUser = {
+        ...user,
+        emailVerified: true,
+        usageStats: {
+          ...user.usageStats,
+          logins: (user.usageStats?.logins || 0) + 1,
+          lastLogin: new Date().toISOString(),
+        },
+      };
+
+      setUsers(users.map((item) => (item.id === updatedUser.id ? updatedUser : item)));
+      setCurrentUser(updatedUser);
+      saveRememberedCredentials(email, form.password.trim(), rememberMe);
+      clearOtpState();
+      resetAuthForm(true);
+      setActiveTab('home');
+      alert('ยืนยันอีเมลสำเร็จ ยินดีต้อนรับ!');
       return;
     }
 
     const name = form.name.trim();
-    const email = form.email.trim();
+    const email = form.email.trim().toLowerCase();
+    const phone = normalizePhone(form.phone);
     const password = form.password.trim();
     const age = Number(form.age);
     const gender = form.gender;
     const currentWeight = Number(form.currentWeight);
     const targetWeight = Number(form.targetWeight);
-    
+
     const newUser = {
       ...INITIAL_USER,
       id: `${Date.now()}`,
       name,
       email,
+      phone,
       password,
       emailVerified: true,
       age,
@@ -634,28 +783,109 @@ function App() {
         lastLogin: new Date().toISOString(),
       },
     };
+
     setUsers([...users, newUser]);
     setCurrentUser(newUser);
     saveRememberedCredentials(email, password, rememberMe);
     resetAuthForm(true);
-    setVerificationStep(null);
-    setOtpCode('');
-    setSentOtpCode('');
+    clearOtpState();
     setActiveTab('home');
+    alert('สมัครสมาชิกและยืนยัน Gmail สำเร็จ!');
   };
 
-  const handleLogin = () => {
-    const email = form.email.trim();
-    const password = form.password.trim();
-    const user = users.find((item) => item.email === email && item.password === password);
-    if (!user) { alert('อีเมลหรือรหัสผ่านไม่ถูกต้อง'); return; }
-    
-    if (!user.emailVerified) {
-      alert('กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ');
+  const handleForgotPasswordRequest = async () => {
+    const phone = normalizePhone(form.phone);
+    if (!isValidThaiPhone(phone)) {
+      alert('กรุณากรอกเบอร์โทรศัพท์ที่ลงทะเบียนไว้ (เช่น 0812345678)');
       return;
     }
-    
-    // Update login stats
+
+    const user = users.find((item) => normalizePhone(item.phone || '') === phone);
+    if (!user) {
+      alert('ไม่พบเบอร์โทรศัพท์นี้ในระบบ');
+      return;
+    }
+    if (!user.email || !isValidGmail(user.email)) {
+      alert('บัญชีนี้ยังไม่มี Gmail ที่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ');
+      return;
+    }
+
+    setResetUserId(user.id);
+    setForm((prev) => ({
+      ...prev,
+      name: user.name,
+      email: user.email,
+      phone,
+    }));
+
+    await issueOtp({
+      toEmail: user.email,
+      userName: user.name,
+      purpose: 'forgot-password',
+    });
+  };
+
+  const handleResetPassword = () => {
+    const newPassword = form.newPassword.trim();
+    const confirmPassword = form.confirmPassword.trim();
+
+    if (!newPassword || !confirmPassword) {
+      alert('กรุณากรอกรหัสผ่านใหม่ให้ครบ');
+      return;
+    }
+    if (newPassword.length < 6) {
+      alert('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert('รหัสผ่านใหม่ไม่ตรงกัน');
+      return;
+    }
+
+    const user = users.find((item) => item.id === resetUserId);
+    if (!user) {
+      alert('ไม่พบบัญชีผู้ใช้');
+      return;
+    }
+
+    const updatedUser = { ...user, password: newPassword };
+    setUsers(users.map((item) => (item.id === updatedUser.id ? updatedUser : item)));
+    saveRememberedCredentials(user.email, newPassword, rememberMe);
+    clearOtpState();
+    switchAuthMode('login');
+    setForm((prev) => ({
+      ...prev,
+      email: user.email,
+      password: newPassword,
+      phone: '',
+      newPassword: '',
+      confirmPassword: '',
+    }));
+    alert('เปลี่ยนรหัสผ่านสำเร็จแล้ว กรุณาเข้าสู่ระบบ');
+  };
+
+  const handleLogin = async () => {
+    const email = form.email.trim().toLowerCase();
+    const password = form.password.trim();
+    const user = users.find((item) => item.email === email && item.password === password);
+    if (!user) {
+      alert('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      return;
+    }
+
+    if (!user.emailVerified) {
+      setForm((prev) => ({ ...prev, name: user.name, email: user.email }));
+      const sent = await issueOtp({
+        toEmail: user.email,
+        userName: user.name,
+        purpose: 'verify-email',
+      });
+      if (sent) {
+        alert('บัญชีนี้ยังไม่ยืนยัน Gmail กรุณากรอก OTP จากอีเมลเพื่อเข้าสู่ระบบ');
+      }
+      return;
+    }
+
     const updatedUser = {
       ...user,
       usageStats: {
@@ -664,7 +894,7 @@ function App() {
         lastLogin: new Date().toISOString(),
       },
     };
-    
+
     setCurrentUser(updatedUser);
     setUsers(users.map((item) => (item.id === updatedUser.id ? updatedUser : item)));
     saveRememberedCredentials(email, password, rememberMe);
@@ -686,29 +916,42 @@ function App() {
   };
 
   const resendOtp = async () => {
-    if (!currentUser) return;
-    
+    if (!currentUser?.email) return;
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      await sendOtpEmail({
+        toEmail: currentUser.email,
+        otp,
+        userName: currentUser.name,
+        purpose: 'verify-email',
+      });
+      alert(`✓ ส่ง OTP ไปที่ ${maskEmail(currentUser.email)} แล้ว\nกรุณาเข้าสู่ระบบและกรอก OTP`);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || 'ส่งอีเมลไม่สำเร็จ');
+      alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})`);
+    }
+  };
+
+  const resendAuthOtp = async () => {
+    if (!otpTargetEmail) return;
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setSentOtpCode(otp);
-    setVerificationStep('otp');
-    
-    const sendOtpEmail = async () => {
-      try {
-        const templateParams = {
-          to_email: currentUser.email,
-          otp_code: otp,
-        };
-        
-        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
-        alert(`✓ OTP ถูกส่งไปที่: ${currentUser.email}`);
-      } catch (error) {
-        console.error('Error sending email:', error);
-          const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || JSON.stringify(error));
-          alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nOTP: ${otp}\n\nตรวจสอบ template!`);
-      }
-    };
-    
-    sendOtpEmail();
+    setOtpExpiresAt(Date.now() + OTP_TTL_MS);
+    setOtpCode('');
+    try {
+      await sendOtpEmail({
+        toEmail: otpTargetEmail,
+        otp,
+        userName: form.name || 'ผู้ใช้งาน',
+        purpose: otpPurpose || 'verify-email',
+      });
+      alert(`✓ ส่ง OTP ใหม่ไปที่ ${maskEmail(otpTargetEmail)} แล้ว`);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert('ไม่สามารถส่ง OTP ใหม่ได้ กรุณาลองอีกครั้ง');
+    }
   };
 
   const updateUser = (updates) => {
@@ -1081,44 +1324,107 @@ function App() {
   }; 
 
   if (!currentUser) {
+    const authTitle = verificationStep === 'otp'
+      ? 'ยืนยัน OTP จาก Gmail'
+      : verificationStep === 'reset-password'
+        ? 'ตั้งรหัสผ่านใหม่'
+        : authMode === 'forgot'
+          ? 'ลืมรหัสผ่าน'
+          : authMode === 'login'
+            ? 'เข้าสู่ระบบ'
+            : 'สมัครสมาชิก';
+
+    const authSubtitle = verificationStep === 'otp'
+      ? `กรอกรหัส 6 หลักที่ส่งไปที่ ${maskEmail(otpTargetEmail || form.email)}`
+      : verificationStep === 'reset-password'
+        ? 'ตั้งรหัสผ่านใหม่สำหรับบัญชีที่ผูกกับเบอร์โทรศัพท์ของคุณ'
+        : authMode === 'forgot'
+          ? 'กรอกเบอร์โทรที่ลงทะเบียน ระบบจะส่ง OTP ไปที่ Gmail ของคุณ'
+          : authMode === 'login'
+            ? 'เข้าสู่ระบบด้วย Gmail และรหัสผ่าน'
+            : 'สมัครด้วย Gmail + เบอร์โทร แล้วยืนยัน OTP จากอีเมล';
+
     return (
       <div className="auth-shell">
         <div className="auth-card">
           <div className="auth-header">
             <div>
               <p className="eyebrow">Health Trainer</p>
-              {verificationStep === 'otp' ? (
-                <h1>ยืนยันอีเมล</h1>
-              ) : (
-                <h1>{authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}</h1>
-              )}
-              <p>{verificationStep === 'otp' ? 'กรุณากรอก OTP ที่ส่งไปยังอีเมลของคุณ' : 'เริ่มต้นดูแลสุขภาพของคุณง่าย ๆ วันนี้'}</p>
+              <h1>{authTitle}</h1>
+              <p>{authSubtitle}</p>
             </div>
-            {verificationStep !== 'otp' && (
+            {verificationStep === null && authMode !== 'forgot' && (
               <div className="auth-switch">
-                <button type="button" className={authMode === 'login' ? 'active' : ''} onClick={() => setAuthMode('login')}>เข้าสู่ระบบ</button>
-                <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => setAuthMode('register')}>สมัครสมาชิก</button>
+                <button type="button" className={authMode === 'login' ? 'active' : ''} onClick={() => switchAuthMode('login')}>เข้าสู่ระบบ</button>
+                <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => switchAuthMode('register')}>สมัครสมาชิก</button>
               </div>
             )}
           </div>
 
           {verificationStep === 'otp' ? (
             <div className="auth-form">
-              <label>OTP Code
-                <input 
-                  type="text" 
-                  value={otpCode} 
-                  onChange={(e) => setOtpCode(e.target.value)} 
-                  placeholder="กรอก 6 หลัก" 
+              <div className="auth-otp-banner">
+                <strong>ตรวจสอบ Gmail ของคุณ</strong>
+                <p>OTP ถูกส่งไปที่ <span>{maskEmail(otpTargetEmail || form.email)}</span></p>
+              </div>
+              <label>รหัส OTP (6 หลัก)
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
                   maxLength="6"
                 />
               </label>
+            </div>
+          ) : verificationStep === 'reset-password' ? (
+            <div className="auth-form">
+              <label>รหัสผ่านใหม่
+                <input
+                  type="password"
+                  value={form.newPassword}
+                  onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+                  placeholder="อย่างน้อย 6 ตัวอักษร"
+                />
+              </label>
+              <label>ยืนยันรหัสผ่านใหม่
+                <input
+                  type="password"
+                  value={form.confirmPassword}
+                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                  placeholder="กรอกรหัสผ่านอีกครั้ง"
+                />
+              </label>
+            </div>
+          ) : authMode === 'forgot' ? (
+            <div className="auth-form">
+              <label>เบอร์โทรศัพท์ที่ลงทะเบียน
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="0812345678"
+                />
+              </label>
+              <p className="auth-hint">OTP จะถูกส่งไปที่ Gmail ที่ผูกกับเบอร์นี้</p>
             </div>
           ) : (
             <div className="auth-form">
               {authMode === 'register' && (
                 <>
                   <label>ชื่อ<input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ชื่อของคุณ" /></label>
+                  <label>เบอร์โทรศัพท์
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      placeholder="0812345678"
+                    />
+                  </label>
                   <label>อายุ<input type="number" min="12" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="อายุ" /></label>
                   <label>เพศ
                     <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
@@ -1131,37 +1437,73 @@ function App() {
                   <label>น้ำหนักเป้าหมาย (กก.)<input type="number" min="1" value={form.targetWeight} onChange={(e) => setForm({ ...form, targetWeight: e.target.value })} placeholder="เช่น 65" /></label>
                 </>
               )}
-              <label>อีเมล (Gmail เท่านั้น)<input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@gmail.com" /></label>
-              <label>รหัสผ่าน<input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="รหัสผ่าน" /></label>
+              <label>อีเมล Gmail
+                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@gmail.com" />
+              </label>
               {authMode === 'login' && (
-                <label className="remember-me">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  <span>จดจำอีเมลและรหัสผ่าน</span>
-                </label>
+                <label>รหัสผ่าน<input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="รหัสผ่าน" /></label>
+              )}
+              {authMode === 'register' && (
+                <label>รหัสผ่าน<input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="อย่างน้อย 6 ตัวอักษร" /></label>
+              )}
+              {authMode === 'login' && (
+                <>
+                  <label className="remember-me">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                    />
+                    <span>จดจำอีเมลและรหัสผ่าน</span>
+                  </label>
+                  <button type="button" className="text-link auth-forgot-link" onClick={() => switchAuthMode('forgot')}>
+                    ลืมรหัสผ่าน?
+                  </button>
+                </>
               )}
             </div>
           )}
 
-          {verificationStep === 'otp' ? (
-            <button type="button" className="button primary" onClick={handleVerifyOtp}>ยืนยัน OTP</button>
-          ) : (
-            <button type="button" className="button primary" onClick={authMode === 'login' ? handleLogin : handleRegister}>{authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}</button>
-          )}
-
-          {verificationStep !== 'otp' && (
-            <p className="auth-note">
-              {authMode === 'login' ? 'ยังไม่มีบัญชี?' : 'มีบัญชีแล้ว?'}{' '}
-              <button type="button" className="text-link" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>{authMode === 'login' ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}</button>
-            </p>
-          )}
+          <div className="auth-actions">
+            {verificationStep === 'otp' ? (
+              <button type="button" className="button primary" onClick={handleVerifyOtp}>ยืนยัน OTP</button>
+            ) : verificationStep === 'reset-password' ? (
+              <button type="button" className="button primary" onClick={handleResetPassword}>บันทึกรหัสผ่านใหม่</button>
+            ) : authMode === 'forgot' ? (
+              <button type="button" className="button primary" onClick={handleForgotPasswordRequest}>ส่ง OTP ไป Gmail</button>
+            ) : (
+              <button type="button" className="button primary" onClick={authMode === 'login' ? handleLogin : handleRegister}>
+                {authMode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครและรับ OTP'}
+              </button>
+            )}
+          </div>
 
           {verificationStep === 'otp' && (
             <p className="auth-note">
-              <button type="button" className="text-link" onClick={() => { setVerificationStep(null); setOtpCode(''); setSentOtpCode(''); }}>ย้อนกลับ</button>
+              <button type="button" className="text-link" onClick={resendAuthOtp}>ส่ง OTP อีกครั้ง</button>
+              {' · '}
+              <button type="button" className="text-link" onClick={() => { clearOtpState(); switchAuthMode('login'); }}>ย้อนกลับ</button>
+            </p>
+          )}
+
+          {verificationStep === 'reset-password' && (
+            <p className="auth-note">
+              <button type="button" className="text-link" onClick={() => { clearOtpState(); switchAuthMode('forgot'); }}>ย้อนกลับ</button>
+            </p>
+          )}
+
+          {verificationStep === null && authMode === 'forgot' && (
+            <p className="auth-note">
+              <button type="button" className="text-link" onClick={() => switchAuthMode('login')}>กลับไปเข้าสู่ระบบ</button>
+            </p>
+          )}
+
+          {verificationStep === null && authMode !== 'forgot' && (
+            <p className="auth-note">
+              {authMode === 'login' ? 'ยังไม่มีบัญชี?' : 'มีบัญชีแล้ว?'}{' '}
+              <button type="button" className="text-link" onClick={() => switchAuthMode(authMode === 'login' ? 'register' : 'login')}>
+                {authMode === 'login' ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ'}
+              </button>
             </p>
           )}
         </div>
@@ -1874,6 +2216,7 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) 
         <label>อายุ<input type="number" value={user.age} readOnly /></label>
         <label>เพศ<input type="text" value={user.gender === 'male' ? 'ชาย' : user.gender === 'female' ? 'หญิง' : 'อื่น ๆ'} readOnly /></label>
         <label>อีเมล<input type="email" value={user.email} readOnly /></label>
+        <label>เบอร์โทรศัพท์<input type="tel" value={user.phone || 'ยังไม่ได้ระบุ'} readOnly /></label>
         <label>สถานะยืนยันอีเมล<input type="text" value={user.emailVerified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'} readOnly /></label>
         {!user.emailVerified && (
           <button type="button" className="button primary" onClick={resendOtp} style={{ marginTop: '12px', width: '100%' }}>
