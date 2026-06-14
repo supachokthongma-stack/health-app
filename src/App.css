@@ -456,6 +456,12 @@ a {
   font-weight: 700;
 }
 
+.auth-otp-hint {
+  margin-top: 8px !important;
+  font-size: 0.84rem;
+  opacity: 0.92;
+}
+
 .auth-hint {
   margin: -4px 0 0;
   font-size: 0.88rem;

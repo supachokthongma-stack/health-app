@@ -376,14 +376,36 @@ function maskEmail(email) {
   return `${visible}${'*'.repeat(Math.max(name.length - 2, 2))}@${domain}`;
 }
 
-async function sendOtpEmail({ toEmail, otp }) {
+function formatOtpSentAt() {
+  return new Date().toLocaleString('th-TH', {
+    timeZone: 'Asia/Bangkok',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+async function sendOtpEmail({ toEmail, otp, userName = '' }) {
+  const sentAt = formatOtpSentAt();
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const templateParams = {
     to_email: toEmail,
     otp_code: otp,
+    sent_at: sentAt,
+    request_id: requestId,
+    user_name: userName || 'ผู้ใช้ Health Trainer',
+    subject: `รหัส OTP Health Trainer — ${sentAt}`,
   };
 
   const response = await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, templateParams, EMAILJS_PUBLIC_KEY);
-  return response;
+  if (response?.status !== 200) {
+    throw { status: response?.status, text: response?.text || 'EmailJS ไม่ยืนยันการส่ง' };
+  }
+  console.info('[OTP] EmailJS accepted', { requestId, toEmail, status: response.status });
+  return { ...response, requestId, sentAt };
 }
 
 function getEmailJsErrorMessage(error) {
@@ -426,7 +448,7 @@ const INITIAL_USER = {
 
 const REMEMBER_KEY = 'healthAppRemember';
 const OTP_SESSION_KEY = 'healthAppOtpSession';
-const OTP_RESEND_COOLDOWN_SEC = 30;
+const OTP_RESEND_COOLDOWN_SEC = 60;
 
 function loadOtpSession() {
   try {
@@ -669,7 +691,7 @@ function App() {
     setIsSendingOtp(true);
 
     try {
-      await sendOtpEmail({ toEmail, otp });
+      await sendOtpEmail({ toEmail, otp, userName });
       setSentOtpCode(otp);
       setOtpExpiresAt(expiresAt);
       setOtpTargetEmail(toEmail);
@@ -681,7 +703,7 @@ function App() {
       setAuthBanner({
         type: 'success',
         text: isResend
-          ? `ส่ง OTP ใหม่ไปที่ ${maskEmail(toEmail)} แล้ว`
+          ? `ส่ง OTP ใหม่ไปที่ ${maskEmail(toEmail)} แล้ว — ถ้าไม่เห็นแจ้งเตือน ให้เช็ค Spam / โปรโมชั่น / กล่องทั้งหมด`
           : `ส่ง OTP ไปที่ ${maskEmail(toEmail)} แล้ว กรุณาเปิด Gmail แล้วกรอกรหัส 6 หลัก`,
       });
       return true;
@@ -1021,7 +1043,7 @@ function App() {
     setAuthBanner(null);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     try {
-      await sendOtpEmail({ toEmail: currentUser.email, otp });
+      await sendOtpEmail({ toEmail: currentUser.email, otp, userName: currentUser.name });
       setAuthBanner({
         type: 'success',
         text: `ส่ง OTP ไปที่ ${maskEmail(currentUser.email)} แล้ว`,
@@ -1472,6 +1494,7 @@ function App() {
               <div className="auth-otp-banner">
                 <strong>ตรวจสอบ Gmail ของคุณ</strong>
                 <p>OTP ถูกส่งไปที่ <span>{maskEmail(otpTargetEmail || form.email)}</span></p>
+                <p className="auth-otp-hint">ถ้าไม่เห็นแจ้งเตือน ให้เช็ค Spam / โปรโมชั่น / กล่องทั้งหมด — รอ 60 วินาทีก่อนกดส่งซ้ำ</p>
               </div>
               <label>รหัส OTP (6 หลัก)
                 <input
