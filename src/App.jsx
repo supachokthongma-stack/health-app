@@ -1180,6 +1180,23 @@ function App() {
 
   return (
     <div className={`app-shell ${isCompact ? 'compact' : ''}`}>
+      {isCompact && (
+        <header className="mobile-topbar">
+          <button
+            type="button"
+            className="icon-button mobile-topbar-menu"
+            aria-label="เปิดเมนู"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu size={20} />
+          </button>
+          <div className="mobile-topbar-center">
+            <span className="mobile-topbar-title">Health Trainer</span>
+            <span className="mobile-topbar-subtitle">{NAV_ITEMS.find((item) => item.id === activeTab)?.label || 'หน้าแรก'}</span>
+          </div>
+          <div className="mobile-topbar-pill">{currentWeight} กก.</div>
+        </header>
+      )}
       {isCompact && sidebarOpen && (
         <button type="button" className="sidebar-backdrop" aria-label="ปิดเมนู" onClick={() => setSidebarOpen(false)} />
       )}
@@ -1228,21 +1245,18 @@ function App() {
           </button>
         </aside>
       )}
-      <main className="content">
+      <main className={`content ${isCompact ? 'content--mobile' : ''}`}>
         <div className="page-header">
           <div className="page-header-top">
-            {isCompact && !sidebarOpen && (
-              <button type="button" className="icon-button mobile-menu-btn" aria-label="เปิดเมนู" onClick={() => setSidebarOpen(true)}>
-                <Menu size={18} />
-              </button>
-            )}
             <div>
               <p className="header-badge"><Star size={16} /> สวัสดี {currentUser.name || 'ผู้ใช้งาน'}</p>
               <h1>ยินดีต้อนรับสู่ Health Trainer 🏋️✨</h1>
-              <p>ติดตามอาหาร 🥗 ออกกำลังกาย 💪 และความก้าวหน้า 📈 ในที่เดียว</p>
+              <p className="page-header-desc">ติดตามอาหาร 🥗 ออกกำลังกาย 💪 และความก้าวหน้า 📈 ในที่เดียว</p>
             </div>
           </div>
-          <div className="stat-pill"><span><strong>{currentWeight} กก.</strong></span></div>
+          {!isCompact && (
+            <div className="stat-pill"><span><strong>{currentWeight} กก.</strong></span></div>
+          )}
         </div>
         {activeTab === 'home' ? (
           currentUser.selectedCourse ? (
