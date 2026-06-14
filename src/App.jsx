@@ -498,12 +498,13 @@ function App() {
     setSentOtpCode(otp);
     setVerificationStep('otp');
     
-    const templateParams = {
-      to_email: email,
-      to_name: name,
-      user_name: name,
-      otp_code: otp,
-      };
+    // Send OTP via EmailJS
+    const sendOtpEmail = async () => {
+      try {
+        const templateParams = {
+          to_email: email,
+          otp_code: otp,
+        };
         
         await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
         alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
