@@ -376,23 +376,26 @@ function maskEmail(email) {
   return `${visible}${'*'.repeat(Math.max(name.length - 2, 2))}@${domain}`;
 }
 
-async function sendOtpEmail({ toEmail, otp, userName, purpose }) {
-  const purposeText = purpose === 'register'
-    ? 'ยืนยันการสมัครสมาชิก Health Trainer'
-    : purpose === 'forgot-password'
-      ? 'รีเซ็ตรหัสผ่าน Health Trainer'
-      : 'ยืนยันอีเมล Health Trainer';
-
+async function sendOtpEmail({ toEmail, otp }) {
   const templateParams = {
     to_email: toEmail,
-    to_name: userName || 'ผู้ใช้งาน',
-    user_name: userName || 'ผู้ใช้งาน',
     otp_code: otp,
-    purpose: purposeText,
-    message: `รหัส OTP ของคุณคือ ${otp} (ใช้ได้ภายใน 10 นาที)`,
   };
 
-  await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, templateParams, EMAILJS_PUBLIC_KEY);
+  const response = await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, templateParams, EMAILJS_PUBLIC_KEY);
+  return response;
+}
+
+function getEmailJsErrorMessage(error) {
+  const raw = error?.text || error?.message || '';
+  const status = error?.status ? `Error ${error.status}` : '';
+
+  if (String(raw).includes('412') || String(status).includes('412') || /invalid grant|insufficient authentication|authentication scopes/i.test(raw)) {
+    return `${status || 'Error 412'}\n\nGmail ใน EmailJS หมดอายุหรือยังไม่ได้อนุญาตส่งอีเมล\n\nวิธีแก้:\n1. เปิด dashboard.emailjs.com\n2. ไปที่ Email Services → service_yiut5r8\n3. กด Disconnect แล้ว Connect Account ใหม่\n4. ติ๊ก "Send email on your behalf"\n5. Save แล้วลองสมัครใหม่`;
+  }
+
+  if (status) return `${status}\n${raw}`.trim();
+  return raw || 'ส่งอีเมลไม่สำเร็จ';
 }
 
 const INITIAL_USER = {
@@ -484,6 +487,7 @@ function App() {
     targetWeight: '65',
   });
   const [rememberMe, setRememberMe] = useState(remembered.rememberMe);
+  const [authBanner, setAuthBanner] = useState(null);
   const [messageText, setMessageText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef(null);
@@ -574,6 +578,7 @@ function App() {
 
   const switchAuthMode = (mode) => {
     setAuthMode(mode);
+    setAuthBanner(null);
     clearOtpState();
     if (mode === 'login') {
       const saved = loadRememberedCredentials();
@@ -590,22 +595,27 @@ function App() {
 
   const issueOtp = async ({ toEmail, userName, purpose }) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setSentOtpCode(otp);
-    setOtpExpiresAt(Date.now() + OTP_TTL_MS);
-    setOtpTargetEmail(toEmail);
-    setOtpPurpose(purpose);
-    setVerificationStep('otp');
-    setOtpCode('');
+    setAuthBanner(null);
 
     try {
-      await sendOtpEmail({ toEmail, otp, userName, purpose });
-      alert(`✓ ส่ง OTP ไปที่ Gmail: ${maskEmail(toEmail)}\nกรุณาเปิดอีเมลแล้วนำรหัส 6 หลักมากรอก`);
+      await sendOtpEmail({ toEmail, otp });
+      setSentOtpCode(otp);
+      setOtpExpiresAt(Date.now() + OTP_TTL_MS);
+      setOtpTargetEmail(toEmail);
+      setOtpPurpose(purpose);
+      setVerificationStep('otp');
+      setOtpCode('');
+      setAuthBanner({
+        type: 'success',
+        text: `ส่ง OTP ไปที่ ${maskEmail(toEmail)} แล้ว กรุณาเปิด Gmail แล้วกรอกรหัส 6 หลัก`,
+      });
       return true;
     } catch (error) {
       console.error('Error sending email:', error);
-      const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || 'ส่งอีเมลไม่สำเร็จ');
-      alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nตรวจสอบ EmailJS template ว่ามีตัวแปร:\n{{to_email}} {{to_name}} {{user_name}} {{otp_code}} {{purpose}} {{message}}`);
-      clearOtpState();
+      setAuthBanner({
+        type: 'error',
+        text: getEmailJsErrorMessage(error),
+      });
       return false;
     }
   };
@@ -875,14 +885,11 @@ function App() {
 
     if (!user.emailVerified) {
       setForm((prev) => ({ ...prev, name: user.name, email: user.email }));
-      const sent = await issueOtp({
+      await issueOtp({
         toEmail: user.email,
         userName: user.name,
         purpose: 'verify-email',
       });
-      if (sent) {
-        alert('บัญชีนี้ยังไม่ยืนยัน Gmail กรุณากรอก OTP จากอีเมลเพื่อเข้าสู่ระบบ');
-      }
       return;
     }
 
@@ -917,40 +924,42 @@ function App() {
 
   const resendOtp = async () => {
     if (!currentUser?.email) return;
-
+    setAuthBanner(null);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     try {
-      await sendOtpEmail({
-        toEmail: currentUser.email,
-        otp,
-        userName: currentUser.name,
-        purpose: 'verify-email',
+      await sendOtpEmail({ toEmail: currentUser.email, otp });
+      setAuthBanner({
+        type: 'success',
+        text: `ส่ง OTP ไปที่ ${maskEmail(currentUser.email)} แล้ว`,
       });
-      alert(`✓ ส่ง OTP ไปที่ ${maskEmail(currentUser.email)} แล้ว\nกรุณาเข้าสู่ระบบและกรอก OTP`);
     } catch (error) {
       console.error('Error sending email:', error);
-      const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || 'ส่งอีเมลไม่สำเร็จ');
-      alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})`);
+      setAuthBanner({
+        type: 'error',
+        text: getEmailJsErrorMessage(error),
+      });
     }
   };
 
   const resendAuthOtp = async () => {
     if (!otpTargetEmail) return;
+    setAuthBanner(null);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setSentOtpCode(otp);
-    setOtpExpiresAt(Date.now() + OTP_TTL_MS);
-    setOtpCode('');
     try {
-      await sendOtpEmail({
-        toEmail: otpTargetEmail,
-        otp,
-        userName: form.name || 'ผู้ใช้งาน',
-        purpose: otpPurpose || 'verify-email',
+      await sendOtpEmail({ toEmail: otpTargetEmail, otp });
+      setSentOtpCode(otp);
+      setOtpExpiresAt(Date.now() + OTP_TTL_MS);
+      setOtpCode('');
+      setAuthBanner({
+        type: 'success',
+        text: `ส่ง OTP ใหม่ไปที่ ${maskEmail(otpTargetEmail)} แล้ว`,
       });
-      alert(`✓ ส่ง OTP ใหม่ไปที่ ${maskEmail(otpTargetEmail)} แล้ว`);
     } catch (error) {
       console.error('Error sending email:', error);
-      alert('ไม่สามารถส่ง OTP ใหม่ได้ กรุณาลองอีกครั้ง');
+      setAuthBanner({
+        type: 'error',
+        text: getEmailJsErrorMessage(error),
+      });
     }
   };
 
@@ -1360,6 +1369,14 @@ function App() {
               </div>
             )}
           </div>
+
+          {authBanner && (
+            <div className={`auth-banner auth-banner--${authBanner.type}`}>
+              {authBanner.text.split('\n').map((line, index) => (
+                <p key={`${authBanner.type}-${index}`}>{line}</p>
+              ))}
+            </div>
+          )}
 
           {verificationStep === 'otp' ? (
             <div className="auth-form">
