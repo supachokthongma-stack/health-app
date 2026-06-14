@@ -37,14 +37,15 @@ body {
     var(--bg);
   color: var(--text);
   line-height: 1.6;
-  overflow: hidden;
+  overflow-x: hidden;
   font-size: 1rem;
 }
 
 .scale-lock-viewport {
-  width: 100vw;
-  height: 100vh;
-  overflow: auto;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -52,7 +53,7 @@ body {
 }
 
 .scale-lock-frame {
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
 }
 
@@ -89,7 +90,7 @@ a {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(280px, 280px) 1fr;
-  min-height: 100vh;
+  min-height: 900px;
   width: 100%;
   align-items: stretch;
   position: relative;
