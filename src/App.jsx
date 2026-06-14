@@ -348,7 +348,7 @@ const AI_RESPONSES = [
 ];
 
 // EmailJS — OTP ส่งไป Gmail
-const EMAILJS_SERVICE = 'service_yiut5r8';
+const EMAILJS_SERVICE = 'service_y45lbjt';
 const EMAILJS_TEMPLATE = 'template_gn2w5f7';
 const EMAILJS_PUBLIC_KEY = 'm9n9iTEHA16p3K76y';
 
@@ -391,7 +391,7 @@ function getEmailJsErrorMessage(error) {
   const status = error?.status ? `Error ${error.status}` : '';
 
   if (String(raw).includes('412') || String(status).includes('412') || /invalid grant|insufficient authentication|authentication scopes/i.test(raw)) {
-    return `${status || 'Error 412'}\n\nGmail ใน EmailJS หมดอายุหรือยังไม่ได้อนุญาตส่งอีเมล\n\nวิธีแก้:\n1. เปิด dashboard.emailjs.com\n2. ไปที่ Email Services → service_yiut5r8\n3. กด Disconnect แล้ว Connect Account ใหม่\n4. ติ๊ก "Send email on your behalf"\n5. Save แล้วลองสมัครใหม่`;
+    return `${status || 'Error 412'}\n\nGmail ใน EmailJS หมดอายุหรือยังไม่ได้อนุญาตส่งอีเมล\n\nวิธีแก้:\n1. เปิด dashboard.emailjs.com\n2. ไปที่ Email Services → service_y45lbjt\n3. กด Disconnect แล้ว Connect Account ใหม่\n4. ติ๊ก "Send email on your behalf"\n5. Save แล้วลองสมัครใหม่`;
   }
 
   if (status) return `${status}\n${raw}`.trim();
