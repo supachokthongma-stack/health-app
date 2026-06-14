@@ -20,6 +20,12 @@
   box-sizing: border-box;
 }
 
+#root {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 html {
   font-size: 16px;
 }
@@ -41,36 +47,6 @@ body {
   font-size: 1rem;
 }
 
-.scale-lock-viewport {
-  width: 100%;
-  min-height: 100vh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  background: inherit;
-}
-
-.scale-lock-frame {
-  overflow: visible;
-  flex-shrink: 0;
-}
-
-.scale-lock-stage {
-  transform-origin: top left;
-  flex-shrink: 0;
-}
-
-html.scale-locked .app-shell {
-  display: grid !important;
-}
-
-html.scale-locked .auth-shell,
-html.scale-locked .app-shell {
-  min-height: 900px;
-}
-
 button,
 input,
 select,
@@ -90,8 +66,10 @@ a {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(280px, 280px) 1fr;
-  min-height: 900px;
+  min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
+  max-width: 100%;
   align-items: stretch;
   position: relative;
 }
@@ -140,22 +118,22 @@ a {
 }
 
 .app-shell.compact .sidebar {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   z-index: 40;
-  width: 280px;
-  max-width: min(280px, 80%);
-  height: 100%;
+  width: min(280px, 82vw);
+  height: 100vh;
+  height: 100dvh;
   box-shadow: 0 30px 80px rgba(49, 46, 129, 0.18);
 }
 
 .app-shell.compact .sidebar.collapsed {
-  width: 280px;
+  width: min(280px, 82vw);
 }
 
 .sidebar-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 30;
   border: none;
@@ -331,6 +309,23 @@ a {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.auth-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.auth-card {
+  width: min(560px, 100%);
+  padding: clamp(22px, 4vw, 34px);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(124, 58, 237, 0.12);
+  box-shadow: 0 30px 80px rgba(49, 46, 129, 0.1);
 }
 
 .card {
@@ -841,31 +836,27 @@ a {
 }
 
 .history-panel {
-  display: grid;
-  grid-template-columns: 1fr 260px;
-  gap: 18px;
+  display: block;
+}
+
+.history-hint {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .history-list {
   display: grid;
   gap: 10px;
-}
-
-.history-list-header {
-  display: grid;
-  grid-template-columns: 1.8fr 0.9fr 0.8fr;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(124, 58, 237, 0.08);
-  color: var(--text);
-  font-weight: 700;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .history-day-item {
-  display: grid;
-  grid-template-columns: 1.8fr 0.9fr 0.8fr;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
   border-radius: 18px;
@@ -873,6 +864,12 @@ a {
   background: rgba(255, 255, 255, 0.95);
   text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.history-meal-count {
+  color: var(--muted);
+  font-size: 0.88rem;
+  flex-shrink: 0;
 }
 
 .history-day-item.active {
@@ -1552,4 +1549,212 @@ a {
   margin: 0;
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+/* Tablet (iPad portrait / small laptop) */
+@media (max-width: 1199px) {
+  .grid-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .meal-history-card {
+    grid-column: span 2;
+  }
+
+  .page-header h1 {
+    font-size: 2rem;
+  }
+}
+
+/* Tablet narrow / large phone landscape */
+@media (max-width: 1023px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .content {
+    padding: 22px 18px 28px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+  }
+
+  .header-info {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .upload-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-modal {
+    width: min(640px, calc(100vw - 32px));
+    max-height: calc(100dvh - 32px);
+  }
+}
+
+/* Mobile phone */
+@media (max-width: 767px) {
+  html {
+    font-size: 15px;
+  }
+
+  .content {
+    padding: 16px 14px 24px;
+  }
+
+  .sidebar {
+    padding: 20px 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+    margin-bottom: 20px;
+    border-radius: 22px;
+  }
+
+  .page-header h1 {
+    font-size: 1.65rem;
+  }
+
+  .page-header p {
+    margin-top: 10px;
+    font-size: 0.95rem;
+  }
+
+  .stat-pill,
+  .header-badge {
+    width: fit-content;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+  }
+
+  .grid-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .meal-history-card {
+    grid-column: span 1;
+  }
+
+  .card {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .card-head h2 {
+    font-size: 1.1rem;
+  }
+
+  .header-info {
+    grid-template-columns: 1fr;
+  }
+
+  .course-card-item,
+  .recipe-item,
+  .exercise-card-item,
+  .meal-log-item,
+  .schedule-item,
+  .exercise-schedule-card-item {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  .history-list {
+    max-height: none;
+  }
+
+  .chat-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-input-row .button.primary {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .weight-input {
+    flex-direction: column;
+  }
+
+  .weight-input .button.primary {
+    width: 100%;
+  }
+
+  .meal-log-form .button.primary {
+    width: 100%;
+  }
+
+  .auth-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auth-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .detail-modal-overlay {
+    padding: 12px;
+  }
+
+  .detail-modal {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    border-radius: 22px;
+  }
+
+  .detail-modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .meal-detail-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .small-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .editor-actions {
+    flex-direction: column;
+  }
+
+  .editor-actions .button {
+    width: 100%;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 399px) {
+  html {
+    font-size: 14px;
+  }
+
+  .brand-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .nav-item,
+  .logout,
+  .icon-button {
+    padding: 12px 14px;
+  }
+
+  .small-cards {
+    grid-template-columns: 1fr;
+  }
 }

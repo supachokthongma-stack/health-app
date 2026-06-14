@@ -1350,29 +1350,16 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
 
   const mealHistory = mealLog || [];
   const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-  const monthLabel = today.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
-  const monthDaysCount = today.getDate();
-
-  const parseThaiDate = (dateString) => {
-    const parts = dateString.split('/').map((item) => Number(item));
-    if (parts.length < 3) return null;
-    const [d, m, y] = parts;
-    return new Date(y, m - 1, d);
-  };
 
   const dayMap = mealHistory.reduce((acc, entry) => {
-    const parsed = parseThaiDate(entry.date);
-    if (!parsed || parsed.getFullYear() !== currentYear || parsed.getMonth() !== currentMonth) return acc;
-    if (!acc[entry.date]) acc[entry.date] = { entries: [], calories: 0 };
+    if (!acc[entry.date]) acc[entry.date] = { entries: [] };
     acc[entry.date].entries.push(entry);
-    acc[entry.date].calories += entry.calories || 0;
     return acc;
   }, {});
 
-  const monthDays = Array.from({ length: monthDaysCount }, (_, index) => {
-    const date = new Date(currentYear, currentMonth, index + 1);
+  const recentDays = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - index);
     const dateKey = date.toLocaleDateString('th-TH');
     const dayLabel = date.toLocaleDateString('th-TH', { weekday: 'short' });
     return {
@@ -1380,22 +1367,17 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
       dayLabel,
       displayDate: date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
       entries: dayMap[dateKey]?.entries || [],
-      calories: dayMap[dateKey]?.calories || 0,
     };
   });
 
   useEffect(() => {
-    if (!selectedDate && monthDays.length > 0) {
-      setSelectedDate(monthDays[monthDays.length - 1]?.date);
+    if (!selectedDate) {
+      setSelectedDate(new Date().toLocaleDateString('th-TH'));
     }
-  }, [monthDays, selectedDate, monthDaysCount]);
+  }, [selectedDate]);
 
-  const selectedDay = monthDays.find((item) => item.date === selectedDate) || monthDays[monthDays.length - 1] || null;
-  const dailyLimit = getCourseCalorieLimit(selectedCourse);
+  const selectedDay = recentDays.find((item) => item.date === selectedDate) || recentDays[0] || null;
   const selectedDayLabel = selectedDay ? `${selectedDay.dayLabel} ${selectedDay.displayDate}` : '';
-  const todayCalories = selectedDay ? selectedDay.calories : 0;
-  const percentUsed = selectedDay ? Math.min(100, Math.round((todayCalories / dailyLimit) * 100)) : 0;
-  const isOver = todayCalories > dailyLimit;
 
   return (
     <div className="grid-layout">
@@ -1453,15 +1435,11 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
       </section>
 
       <section className="meal-history-card card">
-        <div className="card-head"><Flame size={20} /><h2>ประวัติการกิน {monthLabel}</h2></div>
+        <div className="card-head"><Flame size={20} /><h2>ประวัติการกิน (30 วันล่าสุด)</h2></div>
+        <p className="history-hint">เลือกวันที่เพื่อดูรายละเอียดมื้ออาหาร</p>
         <div className="history-panel">
           <div className="history-list">
-            <div className="history-list-header">
-              <span>วันที่</span>
-              <span>สถานะ</span>
-              <span>แคลอรี่</span>
-            </div>
-            {monthDays.map((day) => (
+            {recentDays.map((day) => (
               <button
                 key={day.date}
                 type="button"
@@ -1475,27 +1453,11 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
                   <strong>{day.displayDate}</strong>
                   <span>{day.dayLabel}</span>
                 </div>
-                <span className={`history-status ${day.calories > dailyLimit ? 'over' : 'ok'}`}>
-                  {day.calories > dailyLimit ? 'เกิน' : 'ปกติ'}
-                </span>
-                <span className="history-cal">{day.calories} kcal</span>
+                {day.entries.length > 0 && (
+                  <span className="history-meal-count">{day.entries.length} มื้อ</span>
+                )}
               </button>
             ))}
-          </div>
-
-          <div className="history-graph">
-            <div className="pie-ring" style={{ background: `conic-gradient(var(--primary) 0deg ${percentUsed}%, rgba(249,250,251,1) ${percentUsed}% 360deg)` }}>
-              <div className="pie-center">
-                <strong>{percentUsed}%</strong>
-                <span>{isOver ? 'เกินเป้า' : 'ในเป้า'}</span>
-              </div>
-            </div>
-            <div className="history-summary">
-              <p>แคลอรี่วันนี้: <strong>{todayCalories}</strong> kcal</p>
-              <p>จำกัดเป้า: <strong>{dailyLimit}</strong> kcal</p>
-              <p>มื้อวันนี้: <strong>{selectedDay?.entries.length || 0}</strong></p>
-              <p>สถานะ: <strong>{isOver ? 'เกินเป้า' : 'ไม่เกินเป้า'}</strong></p>
-            </div>
           </div>
         </div>
       </section>
