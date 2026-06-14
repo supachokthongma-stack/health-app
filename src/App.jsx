@@ -23,6 +23,15 @@ import {
 } from 'lucide-react';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as tf from '@tensorflow/tfjs';
+import {
+  buildStravaAuthUrl,
+  clearStravaCallbackFromUrl,
+  exchangeStravaCode,
+  isStravaConfigured,
+  mapStravaActivityToZwift,
+  parseStravaCallback,
+  syncZwiftActivitiesFromStrava,
+} from './strava';
 
 // Initialize EmailJS
 emailjs.init('m9n9iTEHA16p3K76y');
@@ -437,6 +446,8 @@ const INITIAL_USER = {
   mealLog: [],
   chatHistory: [],
   zwiftActivities: [],
+  zwiftConnection: null,
+  stravaTokens: null,
   appleHealthData: [],
   usageStats: {
     logins: 0,
@@ -553,6 +564,9 @@ function App() {
   const autoLoginAttempted = useRef(false);
   const [pendingPremiumCourse, setPendingPremiumCourse] = useState(null);
   const [pendingExerciseSchedule, setPendingExerciseSchedule] = useState([]);
+  const [zwiftStatus, setZwiftStatus] = useState(null);
+  const [zwiftSyncing, setZwiftSyncing] = useState(false);
+  const stravaCallbackHandled = useRef(false);
 
   useEffect(() => {
     localStorage.setItem('healthAppUsers', JSON.stringify(users));
@@ -1084,22 +1098,156 @@ function App() {
   const addZwiftActivity = (activityData) => {
     if (!currentUser) return;
     const activity = {
-      id: `zwift-${Date.now()}`,
-      date: new Date().toLocaleDateString('th-TH'),
-      time: new Date().toLocaleTimeString('th-TH'),
-      deviceName: activityData.deviceName || 'ลู่วิ่งแบบมาตรฐาน',
-      duration: activityData.duration || 0, // นาที
-      distance: activityData.distance || 0, // กม.
+      id: activityData.id || `zwift-${Date.now()}`,
+      stravaId: activityData.stravaId,
+      date: activityData.date || new Date().toLocaleDateString('th-TH'),
+      time: activityData.time || new Date().toLocaleTimeString('th-TH'),
+      deviceName: activityData.deviceName || 'Zwift',
+      duration: activityData.duration || 0,
+      distance: activityData.distance || 0,
       calories: activityData.calories || 0,
       averageHeartRate: activityData.averageHeartRate || 0,
-      activityType: activityData.activityType || 'วิ่ง',
+      activityType: activityData.activityType || 'ปั่นจักรยาน',
+      activityName: activityData.activityName,
+      source: activityData.source || 'manual',
     };
-    const updatedActivities = [...(currentUser.zwiftActivities || []), activity];
-    const stats = currentUser.usageStats || {};
-    stats.exerciseLogsCount = (stats.exerciseLogsCount || 0) + 1;
+    const existing = currentUser.zwiftActivities || [];
+    const withoutDup = activity.stravaId
+      ? existing.filter((item) => item.stravaId !== activity.stravaId)
+      : existing;
+    const updatedActivities = [...withoutDup, activity];
+    const stats = { ...(currentUser.usageStats || {}) };
+    if (!existing.some((item) => item.stravaId && item.stravaId === activity.stravaId)) {
+      stats.exerciseLogsCount = (stats.exerciseLogsCount || 0) + 1;
+    }
     updateUser({ zwiftActivities: updatedActivities, usageStats: stats });
     return activity;
   };
+
+  const connectZwift = () => {
+    setZwiftStatus(null);
+    if (!isStravaConfigured()) {
+      setZwiftStatus({
+        type: 'error',
+        text: 'ยังไม่ได้ตั้งค่า Strava API — ดูวิธีตั้งค่าใน .env.example (VITE_STRAVA_CLIENT_ID + STRAVA_CLIENT_SECRET บน Vercel)',
+      });
+      return;
+    }
+    try {
+      window.location.href = buildStravaAuthUrl();
+    } catch (error) {
+      setZwiftStatus({ type: 'error', text: error.message || 'เปิดหน้าเชื่อมต่อไม่ได้' });
+    }
+  };
+
+  const syncZwiftActivities = async () => {
+    if (!currentUser?.stravaTokens?.refreshToken) {
+      setZwiftStatus({ type: 'error', text: 'กรุณาเชื่อมต่อ Zwift ก่อน' });
+      return;
+    }
+    setZwiftSyncing(true);
+    setZwiftStatus(null);
+    try {
+      const result = await syncZwiftActivitiesFromStrava(currentUser.stravaTokens);
+      const mapped = (result.activities || []).map(mapStravaActivityToZwift);
+      const existing = currentUser.zwiftActivities || [];
+      const manualEntries = existing.filter((item) => !item.stravaId);
+      const merged = [...manualEntries];
+      mapped.forEach((activity) => {
+        if (!merged.some((item) => item.stravaId === activity.stravaId)) {
+          merged.push(activity);
+        } else {
+          const index = merged.findIndex((item) => item.stravaId === activity.stravaId);
+          merged[index] = activity;
+        }
+      });
+      const stats = { ...(currentUser.usageStats || {}) };
+      stats.exerciseLogsCount = Math.max(stats.exerciseLogsCount || 0, merged.length);
+      updateUser({
+        zwiftActivities: merged,
+        stravaTokens: result.tokens || currentUser.stravaTokens,
+        zwiftConnection: {
+          ...(currentUser.zwiftConnection || { via: 'strava' }),
+          lastSyncAt: result.syncedAt || new Date().toISOString(),
+        },
+        usageStats: stats,
+      });
+      setZwiftStatus({
+        type: 'success',
+        text: mapped.length > 0
+          ? `ดึงกิจกรรม Zwift จาก Strava ได้ ${mapped.length} รายการ`
+          : 'เชื่อมต่อแล้ว แต่ยังไม่พบกิจกรรม Zwift — ตรวจสอบว่าใน Zwift เปิด sync ไป Strava แล้ว',
+      });
+    } catch (error) {
+      console.error('Zwift sync failed:', error);
+      setZwiftStatus({
+        type: 'error',
+        text: error.message || 'ดึงข้อมูลไม่สำเร็จ',
+      });
+    } finally {
+      setZwiftSyncing(false);
+    }
+  };
+
+  const disconnectZwift = () => {
+    updateUser({
+      zwiftConnection: null,
+      stravaTokens: null,
+    });
+    setZwiftStatus({ type: 'success', text: 'ยกเลิกการเชื่อมต่อแล้ว' });
+  };
+
+  const completeStravaConnection = async (code) => {
+    setZwiftSyncing(true);
+    setZwiftStatus(null);
+    try {
+      const result = await exchangeStravaCode(code);
+      const athleteName = [result.athlete?.firstname, result.athlete?.lastname].filter(Boolean).join(' ');
+      updateUser({
+        stravaTokens: {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          expiresAt: result.expiresAt,
+        },
+        zwiftConnection: {
+          via: 'strava',
+          athleteId: result.athlete?.id,
+          athleteName,
+          connectedAt: new Date().toISOString(),
+          lastSyncAt: null,
+        },
+      });
+      setActiveTab('settings');
+      setZwiftStatus({
+        type: 'success',
+        text: 'เชื่อมต่อ Zwift ผ่าน Strava สำเร็จ — กด "ดึงข้อมูลล่าสุด" เพื่อนำกิจกรรมเข้าแอpp',
+      });
+    } catch (error) {
+      console.error('Strava connect failed:', error);
+      setZwiftStatus({
+        type: 'error',
+        text: error.message || 'เชื่อมต่อไม่สำเร็จ',
+      });
+    } finally {
+      setZwiftSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (stravaCallbackHandled.current || !currentUser) return;
+    const callback = parseStravaCallback();
+    if (!callback) return;
+    stravaCallbackHandled.current = true;
+    clearStravaCallbackFromUrl();
+    setActiveTab('settings');
+    if (callback.error) {
+      setZwiftStatus({ type: 'error', text: 'ยกเลิกการเชื่อมต่อ Strava' });
+      return;
+    }
+    if (callback.code) {
+      completeStravaConnection(callback.code);
+    }
+  }, [currentUser]);
 
   const addAppleHealthData = (healthData) => {
     if (!currentUser) return;
@@ -1790,7 +1938,19 @@ function App() {
         ) : activeTab === 'chat' ? (
           <ChatTab compact={isCompact} chatHistory={currentUser.chatHistory || []} messageText={messageText} setMessageText={setMessageText} onSend={sendMessage} isTyping={isTyping} />
         ) : activeTab === 'settings' ? (
-          <SettingsTab compact={isCompact} user={currentUser} addZwiftActivity={addZwiftActivity} addAppleHealthData={addAppleHealthData} resendOtp={resendOtp} />
+          <SettingsTab
+            compact={isCompact}
+            user={currentUser}
+            addZwiftActivity={addZwiftActivity}
+            addAppleHealthData={addAppleHealthData}
+            resendOtp={resendOtp}
+            connectZwift={connectZwift}
+            syncZwiftActivities={syncZwiftActivities}
+            disconnectZwift={disconnectZwift}
+            zwiftSyncing={zwiftSyncing}
+            zwiftStatus={zwiftStatus}
+            stravaConfigured={isStravaConfigured()}
+          />
         ) : null}
       </main>
     </div>
@@ -2342,9 +2502,27 @@ function ChatTab({ compact = false, chatHistory, messageText, setMessageText, on
   );
 }
 
-function SettingsTab({ compact = false, user, addZwiftActivity, addAppleHealthData, resendOtp }) {
+function SettingsTab({
+  compact = false,
+  user,
+  addZwiftActivity,
+  addAppleHealthData,
+  resendOtp,
+  connectZwift,
+  syncZwiftActivities,
+  disconnectZwift,
+  zwiftSyncing,
+  zwiftStatus,
+  stravaConfigured,
+}) {
   const [zwiftInput, setZwiftInput] = useState('');
+  const [showManualZwift, setShowManualZwift] = useState(false);
   const [appleHealthInput, setAppleHealthInput] = useState('');
+
+  const isZwiftConnected = Boolean(user.zwiftConnection?.via === 'strava' && user.stravaTokens?.refreshToken);
+  const lastSyncLabel = user.zwiftConnection?.lastSyncAt
+    ? new Date(user.zwiftConnection.lastSyncAt).toLocaleString('th-TH')
+    : null;
   
   const handleAddZwiftActivity = () => {
     if (!zwiftInput.trim()) return;
@@ -2376,21 +2554,23 @@ function SettingsTab({ compact = false, user, addZwiftActivity, addAppleHealthDa
   const lastLogin = user.usageStats?.lastLogin ? new Date(user.usageStats.lastLogin).toLocaleString('th-TH') : 'ไม่มีข้อมูล';
 
   return (
-    <div className="settings-shell">
+    <div className={`settings-shell ${compact ? 'settings-shell--stack' : ''}`}>
       <section className="settings-card card">
         <div className="card-head"><Settings size={20} /><h2>{compact ? 'โปรไฟล์' : 'ตั้งค่าผู้ใช้งาน'}</h2></div>
-        <label>ชื่อ<input type="text" value={user.name} readOnly /></label>
-        <label>อายุ<input type="number" value={user.age} readOnly /></label>
-        <label>เพศ<input type="text" value={user.gender === 'male' ? 'ชาย' : user.gender === 'female' ? 'หญิง' : 'อื่น ๆ'} readOnly /></label>
-        <label>อีเมล<input type="email" value={user.email} readOnly /></label>
-        <label>เบอร์โทรศัพท์<input type="tel" value={user.phone || 'ยังไม่ได้ระบุ'} readOnly /></label>
-        <label>สถานะยืนยันอีเมล<input type="text" value={user.emailVerified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'} readOnly /></label>
+        <div className={`settings-profile ${compact ? 'settings-profile--compact' : ''}`}>
+          <label className="settings-field settings-field--full">ชื่อ<input type="text" value={user.name} readOnly /></label>
+          <label className="settings-field">อายุ<input type="number" value={user.age} readOnly /></label>
+          <label className="settings-field">เพศ<input type="text" value={user.gender === 'male' ? 'ชาย' : user.gender === 'female' ? 'หญิง' : 'อื่น ๆ'} readOnly /></label>
+          <label className="settings-field settings-field--full">อีเมล<input type="email" value={user.email} readOnly /></label>
+          <label className="settings-field settings-field--full">เบอร์โทร<input type="tel" value={user.phone || 'ยังไม่ได้ระบุ'} readOnly /></label>
+          <label className="settings-field">ยืนยันอีเมล<input type="text" value={user.emailVerified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'} readOnly /></label>
+          <label className="settings-field">เป้าหมาย<input type="number" value={user.targetWeight} readOnly /></label>
+        </div>
         {!user.emailVerified && (
-          <button type="button" className="button primary" onClick={resendOtp} style={{ marginTop: '12px', width: '100%' }}>
+          <button type="button" className="button primary settings-otp-btn" onClick={resendOtp}>
             ส่ง OTP อีกครั้ง
           </button>
         )}
-        <label>เป้าหมายน้ำหนัก<input type="number" value={user.targetWeight} readOnly /></label>
       </section>
 
       <section className="card">
@@ -2403,29 +2583,105 @@ function SettingsTab({ compact = false, user, addZwiftActivity, addAppleHealthDa
         </div>
       </section>
 
-      <section className="card">
-        <div className="card-head"><Dumbbell size={20} /><h2>{compact ? 'Zwift' : 'Zwift Integration - บันทึกการออกกำลังกาย'}</h2></div>
-        {!compact && <p>บันทึกการออกกำลังกายจากเครื่องลู่วิ่ง ปั่นจักรยาน หรือเครื่องอื่น ๆ</p>}
-        <div className="zwift-input-form">
-          <label>ข้อมูลการออกกำลังกาย
-            <input 
-              type="text" 
-              value={zwiftInput}
-              onChange={(e) => setZwiftInput(e.target.value)}
-              placeholder="เช่น: ลู่วิ่ง, 30, 5, 300" 
-              title="รูปแบบ: ชื่อเครื่อง, ระยะเวลา(นาที), ระยะทาง(กม.), แคลอรี่"
-            />
-          </label>
-          <button type="button" className="button primary" onClick={handleAddZwiftActivity}>{compact ? 'บันทึก' : 'บันทึก Zwift Activity'}</button>
+      <section className="card zwift-connect-card">
+        <div className="card-head">
+          <img src="/zwift-logo.png" alt="Zwift" className="zwift-logo" />
+          <h2>Zwift</h2>
         </div>
+
+        <p className="zwift-connect-note">
+          {compact
+            ? 'เชื่อมผ่าน Strava (Zwift → Strava → Health Trainer)'
+            : 'Zwift ไม่เปิด API สาธารณะ — ให้เปิด sync Zwift → Strava ก่อน แล้วกดเชื่อมต่อด้านล่าง'}
+        </p>
+
+        {zwiftStatus && (
+          <div className={`auth-banner auth-banner--${zwiftStatus.type} zwift-status-banner`}>
+            {zwiftStatus.text.split('\n').map((line, index) => (
+              <p key={`zwift-status-${index}`}>{line}</p>
+            ))}
+          </div>
+        )}
+
+        <div className="zwift-connect-panel">
+          <div className={`zwift-connection-badge ${isZwiftConnected ? 'connected' : ''}`}>
+            <span className="zwift-connection-dot" />
+            {isZwiftConnected
+              ? `เชื่อมแล้ว${user.zwiftConnection?.athleteName ? ` · ${user.zwiftConnection.athleteName}` : ''}`
+              : 'ยังไม่ได้เชื่อมต่อ'}
+          </div>
+          {lastSyncLabel && (
+            <p className="zwift-last-sync">ดึงข้อมูลล่าสุด: {lastSyncLabel}</p>
+          )}
+
+          <div className="zwift-connect-actions">
+            {!isZwiftConnected ? (
+              <button
+                type="button"
+                className="button zwift-connect-btn"
+                disabled={zwiftSyncing || !stravaConfigured}
+                onClick={connectZwift}
+              >
+                {zwiftSyncing ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ Zwift'}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="button zwift-connect-btn"
+                  disabled={zwiftSyncing}
+                  onClick={syncZwiftActivities}
+                >
+                  {zwiftSyncing ? 'กำลังดึงข้อมูล...' : 'ดึงข้อมูลล่าสุด'}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={zwiftSyncing}
+                  onClick={disconnectZwift}
+                >
+                  ยกเลิกการเชื่อมต่อ
+                </button>
+              </>
+            )}
+          </div>
+
+          {!stravaConfigured && (
+            <p className="zwift-setup-hint">
+              ต้องตั้งค่า Strava API ก่อน (ดูใน .env.example) แล้ว deploy บน Vercel
+            </p>
+          )}
+
+          <details className="zwift-manual-details" open={showManualZwift} onToggle={(e) => setShowManualZwift(e.target.open)}>
+            <summary>บันทึกด้วยตัวเอง (ไม่ผ่าน Strava)</summary>
+            <div className="zwift-input-form">
+              <label>ข้อมูลการออกกำลังกาย
+                <input
+                  type="text"
+                  value={zwiftInput}
+                  onChange={(e) => setZwiftInput(e.target.value)}
+                  placeholder="เช่น: ลู่วิ่ง, 30, 5, 300"
+                  title="รูปแบบ: ชื่อเครื่อง, นาที, กม., แคลอรี่"
+                />
+              </label>
+              <button type="button" className="button secondary" onClick={handleAddZwiftActivity}>
+                บันทึก
+              </button>
+            </div>
+          </details>
+        </div>
+
         {user.zwiftActivities && user.zwiftActivities.length > 0 && (
           <div className="activity-list">
             <h3>กิจกรรมล่าสุด</h3>
-            {user.zwiftActivities.slice(-5).map((activity) => (
+            {user.zwiftActivities.slice(-5).reverse().map((activity) => (
               <div key={activity.id} className="activity-item">
                 <div className="activity-item-main">
-                  <strong>{activity.deviceName}</strong>
-                  <span>{activity.duration} นาที · {activity.distance} กม. · {activity.calories} kcal</span>
+                  <strong>{activity.activityName || activity.deviceName}</strong>
+                  <span>
+                    {activity.activityType} · {activity.duration} นาที · {activity.distance} กม. · {activity.calories} kcal
+                    {activity.source === 'strava' ? ' · Strava' : ''}
+                  </span>
                 </div>
                 <span className="activity-date">{activity.date} {activity.time}</span>
               </div>
@@ -2454,7 +2710,10 @@ function SettingsTab({ compact = false, user, addZwiftActivity, addAppleHealthDa
             <h3>ข้อมูลล่าสุด</h3>
             {user.appleHealthData.slice(-5).map((data) => (
               <div key={data.id} className="health-item">
-                <strong>{data.dataType}</strong>: {data.value} {data.unit}
+                <div className="health-item-main">
+                  <strong>{data.dataType}</strong>
+                  <span>{data.value} {data.unit}</span>
+                </div>
                 <span className="health-date">{data.date} {data.time}</span>
               </div>
             ))}
@@ -2463,8 +2722,8 @@ function SettingsTab({ compact = false, user, addZwiftActivity, addAppleHealthDa
       </section>
 
       <section className="card">
-        <div className="card-head"><Star size={20} /><h2>เคล็ดลับดี ๆ</h2></div>
-        <div className="small-cards">
+        <div className="card-head"><Star size={20} /><h2>เคล็ดลับ</h2></div>
+        <div className={`small-cards ${compact ? 'small-cards--compact' : ''}`}>
           <div><strong>นอนให้เพียงพอ</strong><p>ช่วยฟื้นฟูร่างกาย</p></div>
           <div><strong>กินครบ 5 หมู่</strong><p>ทำให้ร่างกายทำงานดีขึ้น</p></div>
         </div>

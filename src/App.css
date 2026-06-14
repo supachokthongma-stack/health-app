@@ -630,6 +630,117 @@ a {
   color: var(--muted);
 }
 
+/* Zwift + Strava connection */
+.zwift-connect-card .card-head {
+  align-items: center;
+}
+
+.zwift-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.zwift-connect-note {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.zwift-status-banner {
+  margin-bottom: 12px;
+}
+
+.zwift-connect-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 106, 0, 0.08), rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(255, 106, 0, 0.18);
+}
+
+.zwift-connection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.zwift-connection-badge.connected {
+  background: rgba(22, 163, 74, 0.12);
+  color: #166534;
+}
+
+.zwift-connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
+  flex-shrink: 0;
+}
+
+.zwift-connection-badge.connected .zwift-connection-dot {
+  background: #16a34a;
+}
+
+.zwift-last-sync {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.zwift-connect-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.zwift-connect-btn {
+  border: none;
+  background: linear-gradient(135deg, #ff6a00, #ff8c32);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(255, 106, 0, 0.25);
+}
+
+.zwift-connect-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(255, 106, 0, 0.3);
+}
+
+.zwift-connect-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.zwift-setup-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--warning);
+}
+
+.zwift-manual-details {
+  margin-top: 4px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.zwift-manual-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--primary);
+}
+
 .auth-hint {
   margin: -4px 0 0;
   font-size: 0.88rem;
@@ -1785,6 +1896,39 @@ a {
 .settings-shell {
   display: grid;
   gap: 24px;
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-profile {
+  display: grid;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.settings-field--full {
+  grid-column: 1 / -1;
+}
+
+.settings-profile--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
+}
+
+.settings-otp-btn {
+  width: 100%;
+  margin-top: 4px;
 }
 
 .settings-card label {
@@ -1792,6 +1936,20 @@ a {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 18px;
+  color: var(--muted);
+}
+
+.health-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.health-item-main span {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  word-break: break-word;
   color: var(--muted);
 }
 
@@ -1860,11 +2018,13 @@ a {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px;
-  background: var(--surface-soft);
-  border-radius: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(248, 246, 255, 0.95);
+  border: 1px solid rgba(124, 58, 237, 0.08);
+  width: 100%;
+  min-width: 0;
   margin-bottom: 8px;
-  border-left: 3px solid var(--primary);
 }
 
 .activity-item strong,
@@ -2852,6 +3012,149 @@ a {
   white-space: normal;
   text-align: center;
   line-height: 1.35;
+}
+
+/* Settings — mobile stack */
+.content--mobile .settings-shell,
+.settings-shell--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .settings-shell > .card,
+.settings-shell--stack > .card {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.content--mobile .settings-profile,
+.settings-shell--stack .settings-profile {
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .settings-profile--compact,
+.settings-shell--stack .settings-profile--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 10px;
+}
+
+.content--mobile .settings-field,
+.settings-shell--stack .settings-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-width: 0;
+  font-size: 0.84rem;
+}
+
+.content--mobile .settings-field--full,
+.settings-shell--stack .settings-field--full {
+  grid-column: 1 / -1;
+}
+
+.content--mobile .settings-card input,
+.content--mobile .settings-field input,
+.content--mobile .zwift-input-form input,
+.content--mobile .health-input-form input,
+.settings-shell--stack .settings-card input,
+.settings-shell--stack .settings-field input,
+.settings-shell--stack .zwift-input-form input,
+.settings-shell--stack .health-input-form input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+  padding: 12px 14px;
+}
+
+.content--mobile .zwift-input-form,
+.content--mobile .health-input-form,
+.settings-shell--stack .zwift-input-form,
+.settings-shell--stack .health-input-form {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin: 12px 0 0;
+}
+
+.content--mobile .zwift-input-form label,
+.content--mobile .health-input-form label,
+.settings-shell--stack .zwift-input-form label,
+.settings-shell--stack .health-input-form label {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  font-size: 0.84rem;
+}
+
+.content--mobile .activity-list,
+.content--mobile .health-list,
+.settings-shell--stack .activity-list,
+.settings-shell--stack .health-list {
+  width: 100%;
+  min-width: 0;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.content--mobile .activity-item,
+.content--mobile .health-item,
+.settings-shell--stack .activity-item,
+.settings-shell--stack .health-item {
+  width: 100%;
+  min-width: 0;
+}
+
+.content--mobile .activity-item-main span,
+.content--mobile .health-item-main span,
+.settings-shell--stack .activity-item-main span,
+.settings-shell--stack .health-item-main span {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.content--mobile .settings-shell .small-cards,
+.settings-shell--stack .small-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.content--mobile .settings-shell .small-cards > div,
+.settings-shell--stack .small-cards > div {
+  min-width: 0;
+  min-height: auto;
+  padding: 12px;
+}
+
+.content--mobile .settings-shell .small-cards strong,
+.settings-shell--stack .small-cards strong {
+  word-break: break-word;
+  font-size: 0.82rem;
+}
+
+.content--mobile .settings-shell .small-cards p,
+.content--mobile .settings-shell .stat-date,
+.settings-shell--stack .small-cards p,
+.settings-shell--stack .stat-date {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.content--mobile .settings-otp-btn,
+.settings-shell--stack .settings-otp-btn {
+  width: 100%;
+  margin-top: 4px;
 }
 
 /* Large phones */
