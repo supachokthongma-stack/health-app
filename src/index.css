@@ -1,0 +1,643 @@
+﻿:root {
+  color-scheme: dark;
+  color: #e2e8f0;
+  background: #060b17;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  background-image: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 20%), radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.08), transparent 18%);
+}
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+body {
+  background: #060b17;
+  color: #e2e8f0;
+}
+button, input, select, textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 280px;
+  padding: 28px 22px;
+  background: rgba(8, 19, 44, 0.95);
+  border-right: 1px solid rgba(148, 163, 184, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.sidebar.collapsed {
+  width: 84px;
+}
+.sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.brand {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.brand-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(56, 189, 248, 0.18);
+}
+.brand-label {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1rem;
+}
+.brand-subtitle {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.68);
+  font-size: 0.88rem;
+}
+.icon-button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+}
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 14px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #cbd5e1;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.nav-item:hover,
+.nav-item.active {
+  background: rgba(56, 189, 248, 0.16);
+  color: #f8fafc;
+}
+.logout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fafc;
+}
+.content {
+  flex: 1;
+  padding: 32px;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+.page-header h1 {
+  margin: 8px 0 0;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+}
+.page-header p {
+  color: rgba(226, 232, 240, 0.76);
+  max-width: 700px;
+}
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.1);
+  color: #a5f3fc;
+  font-weight: 700;
+}
+.header-badge svg {
+  color: #38bdf8;
+}
+.card-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  color: #c7d2fe;
+}
+.card-head svg {
+  color: #38bdf8;
+}
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.stat-pill p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.72);
+}
+.small-button {
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: rgba(56, 189, 248, 0.1);
+  color: #e2e8f0;
+  font-weight: 700;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+.analysis-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+.progress-section {
+  margin-top: 28px;
+}
+.progress-labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(226, 232, 240, 0.72);
+  margin-bottom: 10px;
+}
+.progress-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+  border-radius: 999px;
+}
+.header-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.header-info div {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+.header-info p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.72);
+}
+.header-info strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 1.55rem;
+}
+.card {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 32px;
+  padding: 28px;
+  color: #e2e8f0;
+}
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: #38bdf8;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.grid-layout {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 24px;
+}
+.welcome-card {
+  grid-column: span 7;
+}
+.course-card,
+.action-card,
+.exercise-card,
+.progress-card,
+.recipe-card,
+.nutrition-card,
+.graph-card,
+.input-card,
+.connect-card,
+.game-card,
+.settings-card {
+  grid-column: span 5;
+}
+.chat-shell {
+  grid-column: span 12;
+}
+.small-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+.small-cards div {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+.small-cards p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.7);
+}
+.small-cards strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 1.25rem;
+}
+.course-list,
+.recipe-list,
+.exercise-list,
+.ingredient-list,
+.weight-history,
+.status-grid {
+  display: grid;
+  gap: 14px;
+}
+.course-card-item,
+.recipe-item,
+.exercise-item,
+.ingredient,
+.weight-entry,
+.upload-box,
+.chat-input-row input,
+.settings-card input,
+.settings-card select {
+  transition: all 0.2s ease;
+}
+.course-card-item,
+.recipe-item,
+.exercise-item,
+.weight-entry,
+.settings-card input,
+.settings-card select {
+  border-radius: 22px;
+}
+.course-card-item,
+.recipe-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+}
+.course-card-item:hover,
+.recipe-item:hover,
+.exercise-item:hover,
+.ingredient:hover,
+.weight-entry:hover {
+  transform: translateY(-1px);
+}
+.course-item.active,
+.recipe-item.active,
+.ingredient.selected {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+}
+.exercise-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.exercise-item p {
+  margin: 0;
+}
+.exercise-item span,
+.course-description,
+.recipe-item span,
+.chat-role,
+.chat-time,
+.header-info p,
+.settings-card span {
+  color: rgba(226, 232, 240, 0.72);
+}
+.nutrition-grid,
+.status-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.nutrition-grid div,
+.status-grid div {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+.upload-box {
+  margin-top: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+.upload-box input {
+  display: none;
+}
+.upload-preview {
+  margin-top: 20px;
+}
+.upload-preview img {
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+.chat-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
+}
+.chat-header h2 {
+  margin: 8px 0 0;
+}
+.chat-messages {
+  display: grid;
+  gap: 16px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.chat-message {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.chat-message.ai {
+  border-left: 4px solid #38bdf8;
+}
+.chat-message.user {
+  border-left: 4px solid #22c55e;
+}
+.chat-role {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+}
+.chat-time {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.6);
+}
+.chat-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+}
+.chat-input-row input,
+.settings-card input,
+.settings-card select,
+.weight-input input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+}
+.weight-history {
+  margin-top: 24px;
+}
+.weight-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+.weight-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  margin-top: 24px;
+}
+.weight-input button {
+  width: auto;
+}
+.ingredient-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.ingredient {
+  justify-content: center;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+.ingredient.selected {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.14);
+}
+.settings-shell {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.settings-card label {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  color: #e2e8f0;
+}
+.settings-card input,
+.settings-card select {
+  padding: 15px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+}
+.button {
+  border: none;
+  border-radius: 20px;
+  padding: 14px 22px;
+  font-weight: 700;
+}
+.button.primary {
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+  color: #020617;
+}
+.button.primary:hover {
+  filter: brightness(1.05);
+}
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.auth-card {
+  width: min(560px, 100%);
+  padding: 34px;
+  border-radius: 36px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+.auth-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.auth-header h1 {
+  margin: 12px 0 0;
+}
+.auth-switch button {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  padding: 10px 18px;
+  border-radius: 999px;
+}
+.auth-switch button.active,
+.auth-switch button:hover {
+  background: rgba(56, 189, 248, 0.16);
+  color: #f8fafc;
+}
+.auth-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 30px;
+}
+.auth-form label {
+  display: grid;
+  gap: 10px;
+  color: #e2e8f0;
+}
+.auth-form input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+}
+.auth-note {
+  margin-top: 22px;
+  color: rgba(226, 232, 240, 0.72);
+}
+.text-link {
+  border: none;
+  background: transparent;
+  color: #38bdf8;
+  cursor: pointer;
+}
+.empty-state {
+  color: rgba(226, 232, 240, 0.7);
+}
+@media (max-width: 1040px) {
+  .grid-layout {
+    grid-template-columns: 1fr;
+  }
+  .welcome-card,
+  .course-card,
+  .action-card,
+  .exercise-card,
+  .progress-card,
+  .recipe-card,
+  .nutrition-card,
+  .graph-card,
+  .input-card,
+  .connect-card,
+  .game-card,
+  .settings-card,
+  .chat-shell {
+    grid-column: span 12;
+  }
+  .settings-shell {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 16px;
+  }
+  .sidebar.collapsed {
+    width: 100%;
+  }
+  .sidebar-top {
+    width: 100%;
+  }
+  .content {
+    padding: 20px;
+  }
+}
