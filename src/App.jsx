@@ -44,7 +44,7 @@ const COURSE_PLANS = [
     details: 'สร้างพื้นฐานอาหารและการออกกำลังกายสำหรับผู้เริ่มต้น',
     difficulty: 'ง่าย',
     goal: 'ลด 5-7 กก.',
-    realistic: 'เหมาะสำหรับคนเริ่มต้นที่ต้องการเปลี่ยนวิถีชีวิต',
+        // Sending OTP email with template parameters
     weightTarget: 6,
     mealSchedule: [
       { time: '07:00', menu: 'ข้าวโอ๊ตกับกล้วยและนมอัลมอนด์' },
@@ -64,7 +64,7 @@ const COURSE_PLANS = [
     details: 'โฟกัสการกินให้ถูกต้องพร้อมกิจวัตรที่สม่ำเสมอ',
     difficulty: 'ง่าย',
     goal: 'ลด 8-10 กก.',
-    realistic: 'ดีสำหรับผู้ที่ต้องการค่อย ๆ ลดน้ำหนักแบบยั่งยืน',
+        // Sending OTP email with template parameters
     weightTarget: 9,
     mealSchedule: [
       { time: '07:30', menu: 'ไข่ต้มกับขนมปังโฮลวีท' },
@@ -512,7 +512,8 @@ function App() {
         alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
       } catch (error) {
         console.error('Error sending email:', error);
-        alert(`⚠️ ไม่สามารถส่งอีเมลได้\n\nOTP ของคุณ: ${otp}\n\nกรุณาตั้งค่า EmailJS ก่อน (ดูรายละเอียดในเอกสาร)`);
+          const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || JSON.stringify(error));
+          alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nOTP ของคุณ: ${otp}\n\nกรุณาตรวจสอบ EmailJS:\n• ไปที่ Dashboard\n• เปิด template: template_gn2w5f7\n• ตรวจสอบว่ามี variables:\n  {{to_email}}, {{to_name}}, {{otp_code}}, {{user_name}}`);
       }
     };
     
@@ -612,7 +613,8 @@ function App() {
         alert(`✓ OTP ถูกส่งไปที่: ${currentUser.email}`);
       } catch (error) {
         console.error('Error sending email:', error);
-        alert(`⚠️ ไม่สามารถส่งอีเมลได้\n\nOTP: ${otp}\n\nกรุณาตั้งค่า EmailJS ก่อน`);
+          const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || JSON.stringify(error));
+          alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nOTP: ${otp}\n\nตรวจสอบ template!`);
       }
     };
     
