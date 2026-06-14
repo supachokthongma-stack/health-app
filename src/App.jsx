@@ -1465,18 +1465,18 @@ function App() {
             : 'สมัครด้วย Gmail + เบอร์โทร แล้วยืนยัน OTP จากอีเมล';
 
     return (
-      <div className="auth-shell">
+      <div className={`auth-shell ${isCompact ? 'auth-shell--compact' : ''}`}>
         <div className="auth-card">
           <div className="auth-header">
-            <div>
+            <div className="auth-header-copy">
               <p className="eyebrow">Health Trainer</p>
               <h1>{authTitle}</h1>
-              <p>{authSubtitle}</p>
+              <p>{isCompact && verificationStep === 'otp' ? `OTP → ${maskEmail(otpTargetEmail || form.email)}` : authSubtitle}</p>
             </div>
             {verificationStep === null && authMode !== 'forgot' && (
               <div className="auth-switch">
                 <button type="button" className={authMode === 'login' ? 'active' : ''} onClick={() => switchAuthMode('login')}>เข้าสู่ระบบ</button>
-                <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => switchAuthMode('register')}>สมัครสมาชิก</button>
+                <button type="button" className={authMode === 'register' ? 'active' : ''} onClick={() => switchAuthMode('register')}>สมัคร</button>
               </div>
             )}
           </div>
@@ -1492,9 +1492,11 @@ function App() {
           {verificationStep === 'otp' ? (
             <div className="auth-form">
               <div className="auth-otp-banner">
-                <strong>ตรวจสอบ Gmail ของคุณ</strong>
-                <p>OTP ถูกส่งไปที่ <span>{maskEmail(otpTargetEmail || form.email)}</span></p>
-                <p className="auth-otp-hint">ถ้าไม่เห็นแจ้งเตือน ให้เช็ค Spam / โปรโมชั่น / กล่องทั้งหมด — รอ 60 วินาทีก่อนกดส่งซ้ำ</p>
+                <strong>ตรวจสอบ Gmail</strong>
+                <p>ส่งไปที่ <span>{maskEmail(otpTargetEmail || form.email)}</span></p>
+                {!isCompact && (
+                  <p className="auth-otp-hint">ถ้าไม่เห็นแจ้งเตือน ให้เช็ค Spam / โปรโมชั่น — รอ 60 วินาทีก่อนส่งซ้ำ</p>
+                )}
               </div>
               <label>รหัส OTP (6 หลัก)
                 <input
@@ -1665,9 +1667,11 @@ function App() {
 
   const sidebarVisible = !isCompact || sidebarOpen;
   const sidebarExpanded = isCompact || showSidebar;
+  const activeTabMeta = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+  const firstName = (currentUser.name || 'ผู้ใช้').split(' ')[0];
 
   return (
-    <div className={`app-shell ${isCompact ? 'compact' : ''}`}>
+    <div className={`app-shell ${isCompact ? 'compact compact-ui' : ''}`}>
       {isCompact && (
         <header className="mobile-topbar">
           <button
@@ -1679,10 +1683,9 @@ function App() {
             <Menu size={20} />
           </button>
           <div className="mobile-topbar-center">
-            <span className="mobile-topbar-title">Health Trainer</span>
-            <span className="mobile-topbar-subtitle">{NAV_ITEMS.find((item) => item.id === activeTab)?.label || 'หน้าแรก'}</span>
+            <span className="mobile-topbar-title">{activeTabMeta.label}</span>
+            <span className="mobile-topbar-subtitle">{firstName} · {currentWeight} กก.</span>
           </div>
-          <div className="mobile-topbar-pill">{currentWeight} กก.</div>
         </header>
       )}
       {isCompact && sidebarOpen && (
@@ -1734,6 +1737,15 @@ function App() {
         </aside>
       )}
       <main className={`content ${isCompact ? 'content--mobile' : ''}`}>
+        {isCompact ? (
+          <div className="page-header page-header--compact">
+            <p className="page-header-eyebrow"><Star size={14} /> Health Trainer</p>
+            <h1>{activeTabMeta.label}</h1>
+            <p className="page-header-desc--compact">
+              สวัสดี {firstName} · น้ำหนัก {currentWeight} กก. → เป้า {currentUser.targetWeight} กก.
+            </p>
+          </div>
+        ) : (
         <div className="page-header">
           <div className="page-header-top">
             <div>
@@ -1742,26 +1754,20 @@ function App() {
               <p className="page-header-desc">ติดตามอาหาร 🥗 ออกกำลังกาย 💪 และความก้าวหน้า 📈 ในที่เดียว</p>
             </div>
           </div>
-          {!isCompact && (
-            <div className="stat-pill"><span><strong>{currentWeight} กก.</strong></span></div>
-          )}
+          <div className="stat-pill"><span><strong>{currentWeight} กก.</strong></span></div>
         </div>
+        )}
         {activeTab === 'home' ? (
           currentUser.selectedCourse ? (
-            <HomeTab currentUser={currentUser} selectedCourse={selectedCourseWithSchedule} mealLog={currentUser.mealLog || []} />
+            <HomeTab compact={isCompact} currentUser={currentUser} selectedCourse={selectedCourseWithSchedule} mealLog={currentUser.mealLog || []} />
           ) : pendingPremiumCourse ? (
-            <PremiumScheduleSetup
-              course={pendingPremiumCourse}
-              schedule={pendingExerciseSchedule}
-              setSchedule={setPendingExerciseSchedule}
-              onSave={savePremiumCourseSelection}
-              onCancel={cancelPremiumCourseSelection}
-            />
+            <PremiumScheduleSetup compact={isCompact} course={pendingPremiumCourse} schedule={pendingExerciseSchedule} setSchedule={setPendingExerciseSchedule} onSave={savePremiumCourseSelection} onCancel={cancelPremiumCourseSelection} />
           ) : (
-            <CourseSelectionGate onSelectCourse={selectCourse} />
+            <CourseSelectionGate compact={isCompact} onSelectCourse={selectCourse} />
           )
         ) : activeTab === 'meals' ? (
           <MealsTab
+            compact={isCompact}
             recipes={RECIPES}
             selectedRecipe={selectedRecipe}
             setSelectedRecipe={setSelectedRecipe}
@@ -1778,24 +1784,24 @@ function App() {
             modelLoading={modelLoading}
           />
         ) : activeTab === 'exercise' ? (
-          <ExerciseTab exercises={EXERCISES} selectedCourse={selectedCourseWithSchedule} />
+          <ExerciseTab compact={isCompact} exercises={EXERCISES} selectedCourse={selectedCourseWithSchedule} />
         ) : activeTab === 'progress' ? (
-          <ProgressTab user={currentUser} currentWeight={currentWeight} addWeight={addWeight} />
+          <ProgressTab compact={isCompact} user={currentUser} currentWeight={currentWeight} addWeight={addWeight} />
         ) : activeTab === 'chat' ? (
-          <ChatTab chatHistory={currentUser.chatHistory || []} messageText={messageText} setMessageText={setMessageText} onSend={sendMessage} isTyping={isTyping} />
+          <ChatTab compact={isCompact} chatHistory={currentUser.chatHistory || []} messageText={messageText} setMessageText={setMessageText} onSend={sendMessage} isTyping={isTyping} />
         ) : activeTab === 'settings' ? (
-          <SettingsTab user={currentUser} addZwiftActivity={addZwiftActivity} addAppleHealthData={addAppleHealthData} resendOtp={resendOtp} />
+          <SettingsTab compact={isCompact} user={currentUser} addZwiftActivity={addZwiftActivity} addAppleHealthData={addAppleHealthData} resendOtp={resendOtp} />
         ) : null}
       </main>
     </div>
   );
 }
 
-function CourseSelectionGate({ onSelectCourse }) {
+function CourseSelectionGate({ compact = false, onSelectCourse }) {
   return (
     <div className="course-selection-shell card">
-      <div className="card-head"><Calendar size={20} /><h2>เลือกคอร์สก่อนเข้าใช้งาน</h2></div>
-      <p>กรุณาเลือกคอร์สแรกก่อนเพื่อให้ระบบแสดงแผนอาหารและตารางออกกำลังกายที่เหมาะสม</p>
+      <div className="card-head"><Calendar size={20} /><h2>{compact ? 'เลือกคอร์ส' : 'เลือกคอร์สก่อนเข้าใช้งาน'}</h2></div>
+      <p>{compact ? 'เลือกแผนที่เหมาะกับคุณ' : 'กรุณาเลือกคอร์สแรกก่อนเพื่อให้ระบบแสดงแผนอาหารและตารางออกกำลังกายที่เหมาะสม'}</p>
       <div className="course-selection-list">
         {COURSE_PLANS.map((course) => (
           <div key={course.id} className={`course-selection-card ${course.premium ? 'course-selection-card-premium' : ''}`}>
@@ -1814,11 +1820,11 @@ function CourseSelectionGate({ onSelectCourse }) {
   );
 }
 
-function PremiumScheduleSetup({ course, schedule, setSchedule, onSave, onCancel }) {
+function PremiumScheduleSetup({ compact = false, course, schedule, setSchedule, onSave, onCancel }) {
   return (
     <div className="course-selection-shell card">
-      <div className="card-head"><Dumbbell size={20} /><h2>ปรับเวลาออกกำลังกาย</h2></div>
-      <p>คอร์ส {course.name} เป็นคอร์สพรีเมี่ยม คุณสามารถปรับเวลาออกกำลังกายก่อนเข้าใช้งานได้</p>
+      <div className="card-head"><Dumbbell size={20} /><h2>{compact ? 'ตั้งเวลาออกกำลัง' : 'ปรับเวลาออกกำลังกาย'}</h2></div>
+      <p>{compact ? `คอร์ส ${course.name} — ปรับเวลาได้ก่อนเริ่ม` : `คอร์ส ${course.name} เป็นคอร์สพรีเมี่ยม คุณสามารถปรับเวลาออกกำลังกายก่อนเข้าใช้งานได้`}</p>
       <div className="premium-schedule-editor">
         {schedule.map((item, index) => (
           <div key={`${item.activity}-${index}`} className="premium-schedule-row">
@@ -1840,13 +1846,13 @@ function PremiumScheduleSetup({ course, schedule, setSchedule, onSave, onCancel 
       </div>
       <div className="editor-actions">
         <button type="button" className="button secondary" onClick={onCancel}>ย้อนกลับ</button>
-        <button type="button" className="button primary" onClick={onSave}>บันทึกและเข้าสู่หน้าแรก</button>
+        <button type="button" className="button primary" onClick={onSave}>{compact ? 'บันทึก' : 'บันทึกและเข้าสู่หน้าแรก'}</button>
       </div>
     </div>
   );
 }
 
-function HomeTab({ currentUser, selectedCourse, mealLog }) {
+function HomeTab({ compact = false, currentUser, selectedCourse, mealLog }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -1885,20 +1891,35 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
     <div className="grid-layout">
       <section className="welcome-card card">
         <div className="card-head"><Calendar size={20} /><h2>ภาพรวม</h2></div>
-        <p>คุณกำลังตั้งเป้าน้ำหนักจาก {currentUser.currentWeight} กก. ไป {currentUser.targetWeight} กก.</p>
+        <p className="card-lead">
+          {compact
+            ? `${currentUser.currentWeight} → ${currentUser.targetWeight} กก.`
+            : `คุณกำลังตั้งเป้าน้ำหนักจาก ${currentUser.currentWeight} กก. ไป ${currentUser.targetWeight} กก.`}
+        </p>
         {selectedCourse ? (
           <>
             {selectedCourse.premium && (
               <div className="premium-course-banner">
-                <strong>Premium</strong> — ติดตามอาหารและออกกำลังกายตามนี้เท่านั้น เพื่อเป้าหมายลด 30 กก. ใน 3 เดือน
+                <strong>Premium</strong>
+                {compact ? ' — ตามแผนนี้เท่านั้น' : ' — ติดตามอาหารและออกกำลังกายตามนี้เท่านั้น เพื่อเป้าหมายลด 30 กก. ใน 3 เดือน'}
               </div>
             )}
-            <div className="header-info">
-              <div><p>แผนที่เลือก</p><strong>{selectedCourse.name}</strong></div>
-              <div><p>ระยะเวลา</p><strong>{selectedCourse.duration}</strong></div>
-              <div><p>เป้าหมาย</p><strong>{selectedCourse.goal}</strong></div>
-              <div><p>น้ำหนักที่คาดหวัง</p><strong>{selectedCourse.weightTarget} กก.</strong></div>
-              <div><p>ระดับความยาก</p><strong>{selectedCourse.difficulty}</strong></div>
+            <div className={`header-info ${compact ? 'header-info--compact' : ''}`}>
+              <div><p>แผน</p><strong>{selectedCourse.name}</strong></div>
+              <div><p>ระยะ</p><strong>{selectedCourse.duration}</strong></div>
+              <div><p>เป้า</p><strong>{selectedCourse.goal}</strong></div>
+              {!compact && (
+                <>
+                  <div><p>น้ำหนักที่คาดหวัง</p><strong>{selectedCourse.weightTarget} กก.</strong></div>
+                  <div><p>ระดับความยาก</p><strong>{selectedCourse.difficulty}</strong></div>
+                </>
+              )}
+              {compact && (
+                <>
+                  <div><p>ลด</p><strong>{selectedCourse.weightTarget} กก.</strong></div>
+                  <div><p>ระดับ</p><strong>{selectedCourse.difficulty}</strong></div>
+                </>
+              )}
             </div>
           </>
         ) : (
@@ -1917,7 +1938,7 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
           ))}
         </div>
         <div className="food-chips">
-          <h3>อาหารแนะนำ</h3>
+          <h3>{compact ? 'แนะนำ' : 'อาหารแนะนำ'}</h3>
           <div className="tags">
             {selectedCourse.recommendedFoods.map((food) => (<span key={food} className="tag">{food}</span>))}
           </div>
@@ -1937,8 +1958,8 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
       </section>
 
       <section className="meal-history-card card">
-        <div className="card-head"><Flame size={20} /><h2>ประวัติการกิน (30 วันล่าสุด)</h2></div>
-        <p className="history-hint">เลือกวันที่เพื่อดูรายละเอียดมื้ออาหาร</p>
+        <div className="card-head"><Flame size={20} /><h2>{compact ? 'ประวัติมื้ออาหาร' : 'ประวัติการกิน (30 วันล่าสุด)'}</h2></div>
+        {!compact && <p className="history-hint">เลือกวันที่เพื่อดูรายละเอียดมื้ออาหาร</p>}
         <div className="history-panel">
           <div className="history-list">
             {recentDays.map((day) => (
@@ -2003,7 +2024,7 @@ function HomeTab({ currentUser, selectedCourse, mealLog }) {
   );
 }
 
-function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, imageFeedback, onImageUpload, onAddMeal, saveAnalysis, discardAnalysis, selectedCourse, mealLog, analysisMealType, setAnalysisMealType, modelLoading }) {
+function MealsTab({ compact = false, recipes, selectedRecipe, setSelectedRecipe, uploadedImage, imageFeedback, onImageUpload, onAddMeal, saveAnalysis, discardAnalysis, selectedCourse, mealLog, analysisMealType, setAnalysisMealType, modelLoading }) {
   const [newDish, setNewDish] = useState('');
   const [newMealType, setNewMealType] = useState('เช้า');
 
@@ -2037,18 +2058,18 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
         <div className="recipe-list">
           {recipes.map((item) => (
             <button key={item.id} type="button" className={`recipe-item ${selectedRecipe === item.id ? 'active' : ''}`} onClick={() => setSelectedRecipe(item.id)}>
-              <div>
+              <div className="recipe-item-body">
                 <strong>{item.title}</strong>
-                <p>{item.description}</p>
+                {!compact && <p>{item.description}</p>}
               </div>
-              <span>{item.calories} kcal</span>
+              <span className="recipe-kcal">{item.calories} kcal</span>
             </button>
           ))}
         </div>
       </section>
 
       <section className="meal-plan-card card">
-        <div className="card-head"><Calendar size={20} /><h2>{selectedCourse ? `แผนอาหาร ${selectedCourse.name}` : 'แผนอาหารประจำสัปดาห์'}</h2></div>
+        <div className="card-head"><Calendar size={20} /><h2>{selectedCourse ? (compact ? `แผน ${selectedCourse.name}` : `แผนอาหาร ${selectedCourse.name}`) : (compact ? 'แผนรายสัปดาห์' : 'แผนอาหารประจำสัปดาห์')}</h2></div>
         {selectedCourse ? (
           <div className="meal-summary-grid">
             {mealCards.map((block) => (
@@ -2079,7 +2100,7 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
         )}
         {selectedCourse && (
           <div className="food-chips">
-            <h3>อาหารแนะนำ</h3>
+            <h3>{compact ? 'แนะนำ' : 'อาหารแนะนำ'}</h3>
             <div className="tags">
               {selectedCourse.recommendedFoods.map((food) => (<span key={food} className="tag">{food}</span>))}
             </div>
@@ -2088,21 +2109,21 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
       </section>
 
       <section className="calorie-summary-card card">
-        <div className="card-head"><BarChart3 size={20} /><h2>สรุปแคลอรี่รายวัน</h2></div>
-        <p>กินไม่เกินนี้ต่อวัน: <strong>{dailyLimit}</strong> kcal</p>
+        <div className="card-head"><BarChart3 size={20} /><h2>{compact ? 'แคลอรี่วันนี้' : 'สรุปแคลอรี่รายวัน'}</h2></div>
+        <p>{compact ? `เป้า ${dailyLimit} kcal` : <>กินไม่เกินนี้ต่อวัน: <strong>{dailyLimit}</strong> kcal</>}</p>
         <div className="calorie-bar"><div className="calorie-fill" style={{ width: `${Math.min(100, (totalCalories / dailyLimit) * 100)}%` }} /></div>
         <div className="calorie-meta"><span>{totalCalories} kcal</span><span>{dailyLimit} kcal</span></div>
-        <div className="macro-summary">
-          <span>โปรตีน {totalProtein.toFixed(1)} กรัม</span>
-          <span>คาร์โบไฮเดรต {totalCarbs.toFixed(1)} กรัม</span>
-          <span>ไขมัน {totalFat.toFixed(1)} กรัม</span>
+        <div className={`macro-summary ${compact ? 'macro-summary--compact' : ''}`}>
+          <span>โปร {totalProtein.toFixed(0)}g</span>
+          <span>คาร์บ {totalCarbs.toFixed(0)}g</span>
+          <span>ไขมัน {totalFat.toFixed(0)}g</span>
         </div>
         {totalCalories > dailyLimit && <p className="warning">คุณเกินเกณฑ์แล้ว ลองปรับมื้อเย็นให้เบาลง</p>}
       </section>
 
       <section className="meal-log-card card">
-        <div className="card-head"><CheckCircle2 size={20} /><h2>บันทึกแคลอรี่วันนี้</h2></div>
-        <p>รวมแคลอรี่วันนี้: <strong>{totalCalories}</strong> kcal</p>
+        <div className="card-head"><CheckCircle2 size={20} /><h2>{compact ? 'บันทึกมื้อ' : 'บันทึกแคลอรี่วันนี้'}</h2></div>
+        <p>{compact ? `วันนี้ ${totalCalories} kcal` : <>รวมแคลอรี่วันนี้: <strong>{totalCalories}</strong> kcal</>}</p>
         <div className="meal-log-form">
           <label>ชื่ออาหาร<input type="text" value={newDish} onChange={(e) => setNewDish(e.target.value)} placeholder="เช่น ข้าวกล้องผัดผัก" /></label>
           <label>มื้ออาหาร
@@ -2113,7 +2134,7 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
               <option value="ว่าง">ว่าง</option>
             </select>
           </label>
-          <button type="button" className="button primary" onClick={handleAddMeal}>AI คำนวณแคลอรี่ให้</button>
+          <button type="button" className="button primary" onClick={handleAddMeal}>{compact ? 'คำนวณแคลอรี่' : 'AI คำนวณแคลอรี่ให้'}</button>
         </div>
         {todayMeals.length > 0 ? (
           <div className="meal-log-list">
@@ -2122,11 +2143,11 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
                 <div>
                   <strong>{entry.dish}</strong>
                   <span>{entry.mealType} - {entry.time}</span>
-                  <div className="meal-log-details">
+                  <div className={`meal-log-details ${compact ? 'meal-log-details--compact' : ''}`}>
                     <span>{entry.calories} kcal</span>
-                    <span>โปรตีน {entry.protein || 0} กรัม</span>
-                    <span>คาร์บ์ {entry.carbs || 0} กรัม</span>
-                    <span>ไขมัน {entry.fat || 0} กรัม</span>
+                    <span>P {entry.protein || 0}g</span>
+                    <span>C {entry.carbs || 0}g</span>
+                    <span>F {entry.fat || 0}g</span>
                   </div>
                 </div>
               </div>
@@ -2139,8 +2160,8 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
 
       <section className="graph-card card">
         <div className="card-head"><Upload size={20} /><h2>วิเคราะห์ภาพอาหาร</h2></div>
-        <label className="upload-box"><Upload size={20} /><span>คลิกเพื่ออัพโหลดภาพ</span><input type="file" accept="image/*" onChange={onImageUpload} /></label>
-        <p className="upload-help">*ระบบจะพยายามวิเคราะห์จากภาพและชื่อไฟล์ โดยใช้ Google Vision API หากเปิดใช้งาน หรือโมเดล MobileNet ในเครื่องเป็นตัวสำรอง</p>
+        <label className="upload-box"><Upload size={20} /><span>{compact ? 'อัพโหลดภาพ' : 'คลิกเพื่ออัพโหลดภาพ'}</span><input type="file" accept="image/*" onChange={onImageUpload} /></label>
+        {!compact && <p className="upload-help">*ระบบจะพยายามวิเคราะห์จากภาพและชื่อไฟล์ โดยใช้ Google Vision API หากเปิดใช้งาน หรือโมเดล MobileNet ในเครื่องเป็นตัวสำรอง</p>}
         {modelLoading && <p className="upload-status">กำลังโหลดโมเดลวิเคราะห์ภาพ... กรุณารอสักครู่</p>}
         {uploadedImage && (
           <div className="upload-preview">
@@ -2196,7 +2217,7 @@ function MealsTab({ recipes, selectedRecipe, setSelectedRecipe, uploadedImage, i
   );
 }
 
-function ExerciseTab({ exercises, selectedCourse }) {
+function ExerciseTab({ compact = false, exercises, selectedCourse }) {
   const today = new Date();
   const weekdays = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
   const themes = ['คาร์ดิโอ', 'ฟื้นฟู', 'แรงต้าน', 'ยืดหยุ่น', 'ความทนทาน', 'ฟิตเนส', 'คูลดาวน์'];
@@ -2210,8 +2231,8 @@ function ExerciseTab({ exercises, selectedCourse }) {
   return (
     <div className="grid-layout">
       <section className="exercise-card card">
-        <div className="card-head"><Dumbbell size={20} /><h2>ออกกำลังกายง่าย ๆ</h2></div>
-        <p className="exercise-card-note">ตารางจะอัปเดตทุกวันตามวันในสัปดาห์ และมีธีมประจำวันให้คุณทำตามได้ง่าย</p>
+        <div className="card-head"><Dumbbell size={20} /><h2>{compact ? 'ท่าออกกำลัง' : 'ออกกำลังกายง่าย ๆ'}</h2></div>
+        {!compact && <p className="exercise-card-note">ตารางจะอัปเดตทุกวันตามวันในสัปดาห์ และมีธีมประจำวันให้คุณทำตามได้ง่าย</p>}
         <div className="exercise-list">
           {exercises.map((item) => {
             const Icon = item.icon;
@@ -2220,19 +2241,19 @@ function ExerciseTab({ exercises, selectedCourse }) {
                 <div className="exercise-icon"><Icon size={20} /></div>
                 <div className="exercise-content">
                   <strong>{item.title}</strong>
-                  <p>{item.summary}</p>
+                  {!compact && <p>{item.summary}</p>}
                 </div>
-                <span className="exercise-badge">ง่าย</span>
+                {!compact && <span className="exercise-badge">ง่าย</span>}
               </div>
             );
           })}
         </div>
       </section>
       <section className="exercise-schedule-card card">
-        <div className="card-head"><Activity size={20} /><h2>{selectedCourse ? `ตาราง ${weekday}` : 'ตารางออกกำลังกายของคอร์ส'}</h2></div>
+        <div className="card-head"><Activity size={20} /><h2>{selectedCourse ? (compact ? `ตาราง ${weekday}` : `ตาราง ${weekday}`) : 'ตารางออกกำลังกาย'}</h2></div>
         {selectedCourse ? (
           <>
-            <p className="exercise-schedule-note">วันนี้เป็นวัน{weekday} ธีมการออกกำลังกาย: {theme}</p>
+            <p className="exercise-schedule-note">{compact ? `ธีม: ${theme}` : `วันนี้เป็นวัน${weekday} ธีมการออกกำลังกาย: ${theme}`}</p>
             <div className="exercise-schedule-grid">
               {routine.map((item) => (
                 <div key={`${item.time}-${item.activity}`} className="exercise-schedule-card-item">
@@ -2250,7 +2271,7 @@ function ExerciseTab({ exercises, selectedCourse }) {
   );
 }
 
-function ProgressTab({ user, currentWeight, addWeight }) {
+function ProgressTab({ compact = false, user, currentWeight, addWeight }) {
   const target = user.targetWeight;
   const progress = target ? Math.max(0, Math.min(100, ((user.currentWeight - target) / user.currentWeight) * 100)) : 0;
   return (
@@ -2265,7 +2286,7 @@ function ProgressTab({ user, currentWeight, addWeight }) {
   );
 }
 
-function ChatTab({ chatHistory, messageText, setMessageText, onSend, isTyping }) {
+function ChatTab({ compact = false, chatHistory, messageText, setMessageText, onSend, isTyping }) {
   const renderMessageText = (text) => {
     return text.split(/(https?:\/\/[^\r\n\s]+)/g).map((part, index) => {
       if (/https?:\/\/[^\r\n\s]+/i.test(part)) {
@@ -2283,7 +2304,7 @@ function ChatTab({ chatHistory, messageText, setMessageText, onSend, isTyping })
     <div className="card chat-shell">
       <div className="chat-header">
         <div className="card-head"><MessageSquare size={20} /><h2>แชท AI</h2></div>
-        <p>ถามผู้ช่วยเกี่ยวกับสุขภาพได้ทันที</p>
+        <p>{compact ? 'ถามเรื่องสุขภาพได้ทันที' : 'ถามผู้ช่วยเกี่ยวกับสุขภาพได้ทันที'}</p>
       </div>
       <div className="chat-messages">
         {chatHistory.length === 0 ? (
@@ -2321,7 +2342,7 @@ function ChatTab({ chatHistory, messageText, setMessageText, onSend, isTyping })
   );
 }
 
-function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) {
+function SettingsTab({ compact = false, user, addZwiftActivity, addAppleHealthData, resendOtp }) {
   const [zwiftInput, setZwiftInput] = useState('');
   const [appleHealthInput, setAppleHealthInput] = useState('');
   
@@ -2357,7 +2378,7 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) 
   return (
     <div className="settings-shell">
       <section className="settings-card card">
-        <div className="card-head"><Settings size={20} /><h2>ตั้งค่าผู้ใช้งาน</h2></div>
+        <div className="card-head"><Settings size={20} /><h2>{compact ? 'โปรไฟล์' : 'ตั้งค่าผู้ใช้งาน'}</h2></div>
         <label>ชื่อ<input type="text" value={user.name} readOnly /></label>
         <label>อายุ<input type="number" value={user.age} readOnly /></label>
         <label>เพศ<input type="text" value={user.gender === 'male' ? 'ชาย' : user.gender === 'female' ? 'หญิง' : 'อื่น ๆ'} readOnly /></label>
@@ -2373,18 +2394,18 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) 
       </section>
 
       <section className="card">
-        <div className="card-head"><Activity size={20} /><h2>สถิติการใช้งาน</h2></div>
-        <div className="small-cards">
-          <div><strong>ครั้งที่ล็อกอิน</strong><p>{user.usageStats?.logins || 0} ครั้ง</p></div>
-          <div><strong>บันทึกมื้ออาหาร</strong><p>{user.usageStats?.mealLogsCount || 0} ครั้ง</p></div>
-          <div><strong>บันทึกออกกำลังกาย</strong><p>{user.usageStats?.exerciseLogsCount || 0} ครั้ง</p></div>
-          <div><strong>ล็อกอินล่าสุด</strong><p>{lastLogin}</p></div>
+        <div className="card-head"><Activity size={20} /><h2>{compact ? 'สถิติ' : 'สถิติการใช้งาน'}</h2></div>
+        <div className={`small-cards ${compact ? 'small-cards--compact' : ''}`}>
+          <div><strong>{compact ? 'ล็อกอิน' : 'ครั้งที่ล็อกอิน'}</strong><p>{user.usageStats?.logins || 0} ครั้ง</p></div>
+          <div><strong>{compact ? 'มื้ออาหาร' : 'บันทึกมื้ออาหาร'}</strong><p>{user.usageStats?.mealLogsCount || 0} ครั้ง</p></div>
+          <div><strong>{compact ? 'ออกกำลัง' : 'บันทึกออกกำลังกาย'}</strong><p>{user.usageStats?.exerciseLogsCount || 0} ครั้ง</p></div>
+          <div><strong>{compact ? 'ล่าสุด' : 'ล็อกอินล่าสุด'}</strong><p className="stat-date">{lastLogin}</p></div>
         </div>
       </section>
 
       <section className="card">
-        <div className="card-head"><Dumbbell size={20} /><h2>Zwift Integration - บันทึกการออกกำลังกาย</h2></div>
-        <p>บันทึกการออกกำลังกายจากเครื่องลู่วิ่ง ปั่นจักรยาน หรือเครื่องอื่น ๆ</p>
+        <div className="card-head"><Dumbbell size={20} /><h2>{compact ? 'Zwift' : 'Zwift Integration - บันทึกการออกกำลังกาย'}</h2></div>
+        {!compact && <p>บันทึกการออกกำลังกายจากเครื่องลู่วิ่ง ปั่นจักรยาน หรือเครื่องอื่น ๆ</p>}
         <div className="zwift-input-form">
           <label>ข้อมูลการออกกำลังกาย
             <input 
@@ -2395,14 +2416,17 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) 
               title="รูปแบบ: ชื่อเครื่อง, ระยะเวลา(นาที), ระยะทาง(กม.), แคลอรี่"
             />
           </label>
-          <button type="button" className="button primary" onClick={handleAddZwiftActivity}>บันทึก Zwift Activity</button>
+          <button type="button" className="button primary" onClick={handleAddZwiftActivity}>{compact ? 'บันทึก' : 'บันทึก Zwift Activity'}</button>
         </div>
         {user.zwiftActivities && user.zwiftActivities.length > 0 && (
           <div className="activity-list">
             <h3>กิจกรรมล่าสุด</h3>
             {user.zwiftActivities.slice(-5).map((activity) => (
               <div key={activity.id} className="activity-item">
-                <strong>{activity.deviceName}</strong> - {activity.duration} นาที - {activity.distance} กม. - {activity.calories} kcal
+                <div className="activity-item-main">
+                  <strong>{activity.deviceName}</strong>
+                  <span>{activity.duration} นาที · {activity.distance} กม. · {activity.calories} kcal</span>
+                </div>
                 <span className="activity-date">{activity.date} {activity.time}</span>
               </div>
             ))}
@@ -2411,8 +2435,8 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) 
       </section>
 
       <section className="card">
-        <div className="card-head"><Heart size={20} /><h2>Apple Health Integration - บันทึกข้อมูลสุขภาพ</h2></div>
-        <p>เชื่อมต่อข้อมูลสุขภาพจาก Apple Health เช่น ก้าวเดิน หัวใจ ฯลฯ</p>
+        <div className="card-head"><Heart size={20} /><h2>{compact ? 'Apple Health' : 'Apple Health Integration - บันทึกข้อมูลสุขภาพ'}</h2></div>
+        {!compact && <p>เชื่อมต่อข้อมูลสุขภาพจาก Apple Health เช่น ก้าวเดิน หัวใจ ฯลฯ</p>}
         <div className="health-input-form">
           <label>ข้อมูล Apple Health
             <input 
@@ -2423,7 +2447,7 @@ function SettingsTab({ user, addZwiftActivity, addAppleHealthData, resendOtp }) 
               title="รูปแบบ: ประเภทข้อมูล, ค่า"
             />
           </label>
-          <button type="button" className="button primary" onClick={handleAddAppleHealth}>บันทึก Apple Health</button>
+          <button type="button" className="button primary" onClick={handleAddAppleHealth}>{compact ? 'บันทึก' : 'บันทึก Apple Health'}</button>
         </div>
         {user.appleHealthData && user.appleHealthData.length > 0 && (
           <div className="health-list">
