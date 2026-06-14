@@ -32,6 +32,13 @@ import {
   parseStravaCallback,
   syncZwiftActivitiesFromStrava,
 } from './strava';
+import {
+  buildAppleHealthSummaryCards,
+  connectAppleHealth as connectAppleHealthService,
+  getAppleHealthAvailabilityMessage,
+  getHealthRuntime,
+  syncAppleHealthMetrics,
+} from './appleHealth';
 
 // Initialize EmailJS
 emailjs.init('m9n9iTEHA16p3K76y');
@@ -448,6 +455,8 @@ const INITIAL_USER = {
   zwiftActivities: [],
   zwiftConnection: null,
   stravaTokens: null,
+  appleHealthConnection: null,
+  appleHealthSummary: null,
   appleHealthData: [],
   usageStats: {
     logins: 0,
@@ -566,7 +575,14 @@ function App() {
   const [pendingExerciseSchedule, setPendingExerciseSchedule] = useState([]);
   const [zwiftStatus, setZwiftStatus] = useState(null);
   const [zwiftSyncing, setZwiftSyncing] = useState(false);
+  const [appleHealthStatus, setAppleHealthStatus] = useState(null);
+  const [appleHealthSyncing, setAppleHealthSyncing] = useState(false);
+  const [healthRuntimeMode, setHealthRuntimeMode] = useState('web');
   const stravaCallbackHandled = useRef(false);
+
+  useEffect(() => {
+    getHealthRuntime().then((runtime) => setHealthRuntimeMode(runtime.mode));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('healthAppUsers', JSON.stringify(users));
@@ -1258,10 +1274,105 @@ function App() {
       dataType: healthData.dataType || 'ก้าวเดิน',
       value: healthData.value || 0,
       unit: healthData.unit || 'ก้าว',
+      source: 'manual',
     };
     const updatedHealthData = [...(currentUser.appleHealthData || []), entry];
     updateUser({ appleHealthData: updatedHealthData });
     return entry;
+  };
+
+  const connectAppleHealth = async () => {
+    setAppleHealthSyncing(true);
+    setAppleHealthStatus(null);
+    try {
+      const result = await connectAppleHealthService();
+      if (!result.success) {
+        setAppleHealthStatus({
+          type: 'error',
+          text: result.message || getAppleHealthAvailabilityMessage(result.mode),
+        });
+        return;
+      }
+      updateUser({
+        appleHealthConnection: {
+          connected: true,
+          platform: result.platform,
+          connectedAt: new Date().toISOString(),
+          lastSyncAt: null,
+        },
+      });
+      setAppleHealthStatus({
+        type: 'success',
+        text: 'เชื่อม Apple Health แล้ว — กด "ดึงข้อมูลล่าสุด" เพื่อดึงก้าวเดิน แคลอรี่ และชีพจร',
+      });
+    } catch (error) {
+      console.error('Apple Health connect failed:', error);
+      setAppleHealthStatus({
+        type: 'error',
+        text: error.message || 'เชื่อมต่อ Apple Health ไม่สำเร็จ',
+      });
+    } finally {
+      setAppleHealthSyncing(false);
+    }
+  };
+
+  const syncAppleHealth = async () => {
+    if (!currentUser?.appleHealthConnection?.connected) {
+      setAppleHealthStatus({ type: 'error', text: 'กรุณาเชื่อมต่อ Apple Health ก่อน' });
+      return;
+    }
+    setAppleHealthSyncing(true);
+    setAppleHealthStatus(null);
+    try {
+      const result = await syncAppleHealthMetrics();
+      const now = new Date();
+      const date = now.toLocaleDateString('th-TH');
+      const time = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+      const manualEntries = (currentUser.appleHealthData || []).filter((item) => item.source !== 'apple-health');
+      const syncedEntries = result.entries.map((entry, index) => ({
+        id: `health-${entry.rawType}-${Date.now()}-${index}`,
+        date,
+        time,
+        dataType: entry.dataType,
+        value: entry.value,
+        unit: entry.unit,
+        rawType: entry.rawType,
+        source: 'apple-health',
+      }));
+
+      updateUser({
+        appleHealthData: [...manualEntries, ...syncedEntries],
+        appleHealthSummary: result.summary,
+        appleHealthConnection: {
+          ...currentUser.appleHealthConnection,
+          lastSyncAt: result.syncedAt,
+        },
+      });
+      setAppleHealthStatus({
+        type: 'success',
+        text: syncedEntries.length > 0
+          ? `ดึงข้อมูล Apple Health วันนี้แล้ว ${syncedEntries.length} รายการ`
+          : 'เชื่อมต่อแล้ว แต่ยังไม่พบข้อมูลวันนี้ — ลองเปิดแอpp Fitness แล้ว sync อีกครั้ง',
+      });
+    } catch (error) {
+      console.error('Apple Health sync failed:', error);
+      setAppleHealthStatus({
+        type: 'error',
+        text: error.message || 'ดึงข้อมูลไม่สำเร็จ',
+      });
+    } finally {
+      setAppleHealthSyncing(false);
+    }
+  };
+
+  const disconnectAppleHealth = () => {
+    const manualEntries = (currentUser.appleHealthData || []).filter((item) => item.source !== 'apple-health');
+    updateUser({
+      appleHealthConnection: null,
+      appleHealthSummary: null,
+      appleHealthData: manualEntries,
+    });
+    setAppleHealthStatus({ type: 'success', text: 'ยกเลิกการเชื่อมต่อ Apple Health แล้ว' });
   };
 
   const addWeight = (weight) => {
@@ -1950,6 +2061,12 @@ function App() {
             zwiftSyncing={zwiftSyncing}
             zwiftStatus={zwiftStatus}
             stravaConfigured={isStravaConfigured()}
+            connectAppleHealth={connectAppleHealth}
+            syncAppleHealth={syncAppleHealth}
+            disconnectAppleHealth={disconnectAppleHealth}
+            appleHealthSyncing={appleHealthSyncing}
+            appleHealthStatus={appleHealthStatus}
+            healthRuntimeMode={healthRuntimeMode}
           />
         ) : null}
       </main>
@@ -2514,12 +2631,22 @@ function SettingsTab({
   zwiftSyncing,
   zwiftStatus,
   stravaConfigured,
+  connectAppleHealth,
+  syncAppleHealth,
+  disconnectAppleHealth,
+  appleHealthSyncing,
+  appleHealthStatus,
+  healthRuntimeMode,
 }) {
   const [zwiftInput, setZwiftInput] = useState('');
   const [showManualZwift, setShowManualZwift] = useState(false);
   const [appleHealthInput, setAppleHealthInput] = useState('');
+  const [showManualHealth, setShowManualHealth] = useState(false);
 
   const isZwiftConnected = Boolean(user.zwiftConnection?.via === 'strava' && user.stravaTokens?.refreshToken);
+  const isAppleHealthConnected = Boolean(user.appleHealthConnection?.connected);
+  const healthSummaryCards = buildAppleHealthSummaryCards(user.appleHealthSummary || {});
+  const healthAvailabilityNote = getAppleHealthAvailabilityMessage(healthRuntimeMode);
   const lastSyncLabel = user.zwiftConnection?.lastSyncAt
     ? new Date(user.zwiftConnection.lastSyncAt).toLocaleString('th-TH')
     : null;
@@ -2690,29 +2817,114 @@ function SettingsTab({
         )}
       </section>
 
-      <section className="card">
-        <div className="card-head"><Heart size={20} /><h2>{compact ? 'Apple Health' : 'Apple Health Integration - บันทึกข้อมูลสุขภาพ'}</h2></div>
-        {!compact && <p>เชื่อมต่อข้อมูลสุขภาพจาก Apple Health เช่น ก้าวเดิน หัวใจ ฯลฯ</p>}
-        <div className="health-input-form">
-          <label>ข้อมูล Apple Health
-            <input 
-              type="text" 
-              value={appleHealthInput}
-              onChange={(e) => setAppleHealthInput(e.target.value)}
-              placeholder="เช่น: ก้าวเดิน, 8000" 
-              title="รูปแบบ: ประเภทข้อมูล, ค่า"
-            />
-          </label>
-          <button type="button" className="button primary" onClick={handleAddAppleHealth}>{compact ? 'บันทึก' : 'บันทึก Apple Health'}</button>
+      <section className="card apple-health-connect-card">
+        <div className="card-head">
+          <div className="apple-health-icon"><Heart size={20} /></div>
+          <h2>{compact ? 'Apple Health' : 'Apple Health / Fitness'}</h2>
         </div>
+
+        <p className="apple-health-note">
+          {compact
+            ? 'เชื่อมข้อมูลก้าวเดิน แคลอรี่ ระยะทาง จาก iPhone'
+            : 'ดึงข้อมูลจาก Apple Health / แอpp Fitness บน iPhone (ก้าวเดิน แคลอรี่ ระยะทาง ชีพจร)'}
+        </p>
+
+        {healthRuntimeMode !== 'native' && healthAvailabilityNote && (
+          <p className="apple-health-runtime-note">{healthAvailabilityNote}</p>
+        )}
+
+        {appleHealthStatus && (
+          <div className={`auth-banner auth-banner--${appleHealthStatus.type} apple-health-status-banner`}>
+            {appleHealthStatus.text.split('\n').map((line, index) => (
+              <p key={`apple-health-status-${index}`}>{line}</p>
+            ))}
+          </div>
+        )}
+
+        <div className="apple-health-connect-panel">
+          <div className={`apple-health-connection-badge ${isAppleHealthConnected ? 'connected' : ''}`}>
+            <span className="apple-health-connection-dot" />
+            {isAppleHealthConnected ? 'เชื่อม Apple Health แล้ว' : 'ยังไม่ได้เชื่อมต่อ'}
+          </div>
+
+          {user.appleHealthConnection?.lastSyncAt && (
+            <p className="apple-health-last-sync">
+              ดึงข้อมูลล่าสุด: {new Date(user.appleHealthConnection.lastSyncAt).toLocaleString('th-TH')}
+            </p>
+          )}
+
+          {isAppleHealthConnected && user.appleHealthSummary && (
+            <div className="apple-health-summary-grid">
+              {healthSummaryCards.map((item) => (
+                <div key={item.key} className="apple-health-summary-item">
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <small>{item.unit}</small>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="apple-health-connect-actions">
+            {!isAppleHealthConnected ? (
+              <button
+                type="button"
+                className="button apple-health-connect-btn"
+                disabled={appleHealthSyncing}
+                onClick={connectAppleHealth}
+              >
+                {appleHealthSyncing ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ Apple Health'}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="button apple-health-connect-btn"
+                  disabled={appleHealthSyncing}
+                  onClick={syncAppleHealth}
+                >
+                  {appleHealthSyncing ? 'กำลังดึงข้อมูล...' : 'ดึงข้อมูลล่าสุด'}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={appleHealthSyncing}
+                  onClick={disconnectAppleHealth}
+                >
+                  ยกเลิกการเชื่อมต่อ
+                </button>
+              </>
+            )}
+          </div>
+
+          <details className="apple-health-manual-details" open={showManualHealth} onToggle={(e) => setShowManualHealth(e.target.open)}>
+            <summary>บันทึกด้วยตัวเอง</summary>
+            <div className="health-input-form">
+              <label>ข้อมูลสุขภาพ
+                <input
+                  type="text"
+                  value={appleHealthInput}
+                  onChange={(e) => setAppleHealthInput(e.target.value)}
+                  placeholder="เช่น: ก้าวเดิน, 8000"
+                  title="รูปแบบ: ประเภทข้อมูล, ค่า"
+                />
+              </label>
+              <button type="button" className="button secondary" onClick={handleAddAppleHealth}>บันทึก</button>
+            </div>
+          </details>
+        </div>
+
         {user.appleHealthData && user.appleHealthData.length > 0 && (
           <div className="health-list">
-            <h3>ข้อมูลล่าสุด</h3>
-            {user.appleHealthData.slice(-5).map((data) => (
+            <h3>ประวัติข้อมูล</h3>
+            {user.appleHealthData.slice(-5).reverse().map((data) => (
               <div key={data.id} className="health-item">
                 <div className="health-item-main">
                   <strong>{data.dataType}</strong>
-                  <span>{data.value} {data.unit}</span>
+                  <span>
+                    {data.value} {data.unit}
+                    {data.source === 'apple-health' ? ' · Apple Health' : ''}
+                  </span>
                 </div>
                 <span className="health-date">{data.date} {data.time}</span>
               </div>

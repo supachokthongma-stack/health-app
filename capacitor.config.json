@@ -1,0 +1,8 @@
+{
+  "appId": "com.healthtrainer.app",
+  "appName": "Health Trainer",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic"
+  }
+}
