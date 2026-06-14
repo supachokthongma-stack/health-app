@@ -508,8 +508,7 @@ function App() {
           user_name: name,
         };
         
-      // เปลี่ยนมาเรียกใช้แบบนี้เพื่อป้องกันไม่ให้ Component มองไม่เห็นตัวแปร emailjs ครับ
-        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams);
+     
         alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
       } catch (error) {
         console.error('Error sending email:', error);
@@ -610,9 +609,13 @@ function App() {
           user_name: currentUser.name,
         };
         
-        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams);
-        alert(`✓ OTP ถูกส่งไปที่: ${currentUser.email}`);
-      } catch (error) {
+        // ❌ ของเดิมที่มี 2 บรรทัดซ้ำกันขวางอยู่ ให้ลบออกทั้งหมดแล้วเปลี่ยนเป็นแบบด้านล่างนี้ครับ:
+
+        // ✅ ปรับให้เหลือบรรทัดเดียว และระบุค่าให้ครบถ้วนแบบนี้เลยครับ
+        await emailjs.send('service_yiut5r8', 'template_gn2w5f7', templateParams, 'm9n9iTEHA16p3K76y');
+        
+        alert(`✓ OTP ถูกส่งไปที่: ${email}\nกรุณาตรวจสอบอีเมลของคุณ`);
+     } catch (error) {
         console.error('Error sending email:', error);
           const errorMsg = error?.status ? `Error ${error.status}` : (error?.message || JSON.stringify(error));
           alert(`⚠️ ไม่สามารถส่งอีเมลได้ (${errorMsg})\n\nOTP: ${otp}\n\nตรวจสอบ template!`);
